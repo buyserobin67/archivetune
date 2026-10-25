@@ -88,13 +88,42 @@ describe('UpdateManager', () => {
     expect(w.sent).toHaveLength(1);
   });
 
-  it('check() records success and reports failure (offline) without throwing', async () => {
+  it('check() says "current" when nothing new exists and the server agrees', async () => {
+    const m = new UpdateManager(new C(), vi.fn(), 4000, async () => ({ version: '1', build: 'aaa' }), 'aaa');
+    const r = new Reg(); m.attach(r);
+    expect(await m.check(10)).toEqual({ kind: 'current' });
+    expect(m.getState()).toMatchObject({ lastChecked: 10, error: null, checking: false, outcome: { kind: 'current' } });
+  });
+
+  it('check() reports a newer deployed build the phone has not received, instead of silently saying "up to date"', async () => {
+    const m = new UpdateManager(new C(), vi.fn(), 4000, async () => ({ version: '0.9.0', build: 'bbb' }), 'aaa');
+    m.attach(new Reg());
+    expect(await m.check()).toEqual({ kind: 'behind', remoteVersion: '0.9.0', remoteBuild: 'bbb' });
+  });
+
+  it('check() waits for a new version to finish downloading and then reports it ready', async () => {
     const c = new C(), r = new Reg(), m = new UpdateManager(c, vi.fn());
     m.attach(r);
-    await m.check(10);
-    expect(m.getState()).toMatchObject({ lastChecked: 10, error: null, checking: false });
+    const w = new W();
+    r.update.mockImplementation(async () => { r.found(w); setTimeout(() => w.set('installed'), 5); });
+    expect(await m.check()).toEqual({ kind: 'ready' });
+    expect(m.getState()).toMatchObject({ ready: true, installing: false });
+  });
+
+  it('check() finds an update that is already waiting', async () => {
+    const c = new C(), r = new Reg(), m = new UpdateManager(c, vi.fn());
+    m.attach(r);
+    r.update.mockImplementation(async () => { r.waiting = new W(); });
+    expect(await m.check()).toEqual({ kind: 'ready' });
+    expect(m.getState().ready).toBe(true);
+  });
+
+  it('check() reports failure (offline) without throwing, and an unreachable version file is not an error', async () => {
+    const r = new Reg(), m = new UpdateManager(new C(), vi.fn(), 4000, async () => { throw new Error('x'); }, 'aaa');
+    m.attach(r);
+    expect(await m.check(10)).toEqual({ kind: 'current' });
     r.update.mockRejectedValueOnce(new Error('offline'));
-    await m.check(20);
+    expect(await m.check(20)).toEqual({ kind: 'offline', message: 'offline' });
     expect(m.getState()).toMatchObject({ lastChecked: 20, error: 'offline', checking: false });
   });
 });

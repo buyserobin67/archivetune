@@ -61,6 +61,8 @@ function serviceWorkerManifest(): Plugin {
         .replace('__PRECACHE_FILES__', JSON.stringify(files))
         .replace('__SW_VERSION__', version);
       writeFileSync(swPath, sw);
+      // Tiny file the app fetches (never cached) to learn which build is deployed, independent of the service worker.
+      writeFileSync(join(outDir, 'version.json'), JSON.stringify({ version: appDefines.__APP_VERSION__ && JSON.parse(appDefines.__APP_VERSION__), build: JSON.parse(appDefines.__APP_BUILD__), swVersion: version, builtAt: JSON.parse(appDefines.__APP_BUILT_AT__) }));
       copyFileSync(join(outDir, 'index.html'), join(outDir, '404.html'));
     },
   };

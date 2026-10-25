@@ -183,12 +183,18 @@ async function scenario(tag, distA, distB, distC, work) {
       const about = await page.locator('[data-testid="about-data"]').innerText();
       check(/App version/.test(about) && /Database version\s*v4/.test(about), 'Settings shows app version and database version');
       await page.screenshot({ path: `${dir}/settings-about.png` });
+      // "Check for updates" must always visibly answer
+      await page.click('button:has-text("Check for updates")');
+      const answered = await page.waitForFunction(() => /latest version/i.test(document.querySelector('[data-testid="update-status"]')?.textContent ?? ''), null, { timeout: 15000 }).then(() => true, () => false);
+      check(answered, 'Check for updates answers "You are on the latest version" when nothing new is deployed');
       await sleep(1500);
     }
 
     // ---- C: another deploy to the same URL while B is open ----
     root = distC;
-    await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()));
+    await page.click('button:has-text("Check for updates")');
+    const statusReady = await page.waitForFunction(() => /Restart to update/i.test(document.querySelector('[data-testid="update-status"]')?.textContent ?? ''), null, { timeout: 20000 }).then(() => true, () => false);
+    check(statusReady, 'Check for updates finds the new deploy and says Restart to update');
     const banner = page.locator('text=New Cadence version available');
     const shown = await banner.first().waitFor({ timeout: 15000 }).then(() => true, () => false);
     check(shown, 'a waiting update shows "New Cadence version available — Restart to update."');

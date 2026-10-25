@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { APP_BUILD } from './appInfo';
 
 /**
  * App updates, without touching your data.
@@ -24,6 +25,14 @@ export interface ContainerLike {
   addEventListener(type: 'controllerchange', fn: () => void): void;
 }
 
+export type CheckOutcome =
+  | { kind: 'ready' }                                   // an update is downloaded and waiting for Restart
+  | { kind: 'current' }                                 // this is the newest deployed build
+  | { kind: 'behind'; remoteVersion: string; remoteBuild: string } // a newer build is deployed but this phone has not received it yet
+  | { kind: 'offline'; message: string };
+
+export interface RemoteVersion { version: string; build: string }
+
 export interface UpdateState {
   /** A newer version is installed and waiting. */
   ready: boolean;
@@ -33,16 +42,20 @@ export interface UpdateState {
   error: string | null;
   /** The user tapped Restart and the switch is in progress. */
   applying: boolean;
+  /** A newer worker is downloading right now. */
+  installing: boolean;
+  /** What the last check found. */
+  outcome: CheckOutcome | null;
 }
 
 export class UpdateManager {
-  private state: UpdateState = { ready: false, checking: false, lastChecked: null, error: null, applying: false };
+  private state: UpdateState = { ready: false, checking: false, lastChecked: null, error: null, applying: false, installing: false, outcome: null };
   private listeners = new Set<() => void>();
   private reg: RegistrationLike | null = null;
   private waiting: WorkerLike | null = null;
   private reloaded = false;
 
-  constructor(private container: ContainerLike, private reload: () => void, private fallbackMs = 4000) {
+  constructor(private container: ContainerLike, private reload: () => void, private fallbackMs = 4000, private fetchRemote: () => Promise<RemoteVersion | null> = async () => null, private ownBuild = '', private installWaitMs = 20000) {
     container.addEventListener('controllerchange', () => {
       // The waiting worker took over (we asked it to). Reload exactly once to run the new files.
       if (this.state.applying) this.doReload();
@@ -71,18 +84,48 @@ export class UpdateManager {
     this.set({ ready: true });
   }
 
-  /** Asks the browser to look for a newer deploy. Safe to call often. */
-  async check(now = Date.now()): Promise<void> {
-    if (!this.reg || this.state.checking) return;
-    this.set({ checking: true, error: null });
+  /**
+   * Looks for a newer deploy and says clearly what it found. Waits for a new version to finish downloading so the
+   * answer is real, and also asks the server which build is deployed so "up to date" is never a guess.
+   */
+  async check(now = Date.now()): Promise<CheckOutcome | null> {
+    if (!this.reg || this.state.checking) return null;
+    this.set({ checking: true, error: null, outcome: null });
+    let outcome: CheckOutcome;
     try {
       await this.reg.update();
-      this.set({ lastChecked: now });
+      if (this.reg.installing && !this.state.ready) {
+        this.set({ installing: true });
+        await this.untilSettled(this.reg.installing);
+        this.set({ installing: false });
+      }
+      if (this.state.ready || this.reg.waiting) {
+        outcome = { kind: 'ready' };
+        if (!this.state.ready && this.reg.waiting && this.container.controller) this.markReady(this.reg.waiting);
+      } else {
+        const remote = await this.fetchRemote().catch(() => null);
+        outcome = remote && this.ownBuild && remote.build !== this.ownBuild
+          ? { kind: 'behind', remoteVersion: remote.version, remoteBuild: remote.build }
+          : { kind: 'current' };
+      }
+      this.set({ lastChecked: now, outcome });
     } catch (e) {
-      this.set({ error: e instanceof Error ? e.message : 'Could not check for updates', lastChecked: now });
+      const message = e instanceof Error ? e.message : 'Could not check for updates';
+      outcome = { kind: 'offline', message };
+      this.set({ error: message, lastChecked: now, outcome, installing: false });
     } finally {
       this.set({ checking: false });
     }
+    return outcome;
+  }
+
+  private untilSettled(worker: WorkerLike): Promise<void> {
+    return new Promise((resolve) => {
+      const done = () => { if (worker.state === 'installed' || worker.state === 'activated' || worker.state === 'redundant') resolve(); };
+      done();
+      worker.addEventListener('statechange', done);
+      setTimeout(resolve, this.installWaitMs);
+    });
   }
 
   /** Activates the waiting version and reloads. Call `beforeSwitch` to save playback position etc. */
@@ -109,6 +152,14 @@ let manager: UpdateManager | null = null;
 const CHECK_EVERY_MS = 30 * 60 * 1000;
 const MIN_GAP_MS = 5 * 60 * 1000;
 
+/** Which build is deployed right now (never cached). null when it cannot be reached. */
+export async function fetchDeployedVersion(): Promise<RemoteVersion | null> {
+  const res = await fetch(`${import.meta.env.BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) return null;
+  const j = (await res.json()) as Partial<RemoteVersion>;
+  return j.build ? { version: String(j.version ?? ''), build: String(j.build) } : null;
+}
+
 export function getUpdateManager(): UpdateManager | null {
   return manager;
 }
@@ -117,7 +168,7 @@ export function getUpdateManager(): UpdateManager | null {
 export function initUpdates(): void {
   if (manager || typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !import.meta.env.PROD) return;
   const base = import.meta.env.BASE_URL;
-  manager = new UpdateManager(navigator.serviceWorker, () => location.reload());
+  manager = new UpdateManager(navigator.serviceWorker, () => location.reload(), 4000, fetchDeployedVersion, APP_BUILD);
   const m = manager;
   const go = () => {
     navigator.serviceWorker.register(`${base}sw.js`, { scope: base }).then((reg) => {
@@ -133,7 +184,7 @@ export function initUpdates(): void {
   setInterval(maybe, CHECK_EVERY_MS);
 }
 
-const EMPTY: UpdateState = { ready: false, checking: false, lastChecked: null, error: null, applying: false };
+const EMPTY: UpdateState = { ready: false, checking: false, lastChecked: null, error: null, applying: false, installing: false, outcome: null };
 const NOOP_SUB = () => () => {};
 
 export function useAppUpdate(): UpdateState {

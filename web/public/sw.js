@@ -43,6 +43,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // never touch third-party requests
   if (!url.href.startsWith(self.registration.scope)) return;
+  if (url.pathname.endsWith('/version.json')) return; // always go to the network: it tells the app what is deployed
 
   event.respondWith(
     (async () => {
