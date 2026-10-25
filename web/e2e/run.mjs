@@ -11,7 +11,7 @@ const URL = `http://localhost:${PORT}${BASE}`;
 const FX = resolve('e2e/fixtures');
 const OUT = resolve('e2e/screenshots');
 const AUDIO = ['ember.mp3', 'tide.mp3', 'fern.mp3', 'extra0.mp3', 'extra1.mp3', 'extra2.mp3', 'extra3.mp3', 'tone-a.wav', 'art-transparent.mp3', 'art-pillarbox.mp3', 'art-landscape.mp3', 'art-letterbox.mp3', 'art-portrait.mp3'].map((f) => `${FX}/${f}`);
-const IMPORT_ALL = [...AUDIO, `${FX}/ember.lrc`, `${FX}/ember.mp3`]; // + lyric sidecar + a duplicate
+const IMPORT_ALL = [...AUDIO, `${FX}/ember.lrc`, `${FX}/tide.txt`, `${FX}/ember.mp3`]; // + lyric sidecars (synced .lrc, plain .txt with metadata header) + a duplicate
 
 const VIEWPORTS = [
   { name: 'se-320x568', width: 320, height: 568, safe: { top: 20, bottom: 0 } },
@@ -291,6 +291,57 @@ async function run() {
       await page.waitForTimeout(400);
       const seeked = await page.evaluate((s) => Number(document.querySelector(s).value), `${P} input[type=range]`);
       check(seeked >= 3.5, 'tapping a lyric line seeks to it', String(seeked));
+      // reduced motion: the active line stops animating
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.waitForTimeout(400);
+      const dur = await page.evaluate((s) => getComputedStyle(document.querySelector(`${s} [data-line] button`)).transitionDuration, P);
+      check(parseFloat(dur) <= 0.001, 'reduced motion: lyric lines do not animate', dur);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+      // ---- Lyrics (plain .txt with a metadata header): clean, evenly readable, scrolls on its own ----
+      for (let n = 0; n < 12; n++) {
+        const nowTitle = await page.locator(`${P} header .truncate`).last().innerText();
+        if (/Tide Study/.test(nowTitle)) break;
+        await page.click(`${P} [aria-label="Next track"]`);
+        await page.waitForTimeout(500);
+      }
+      await page.waitForSelector(`${P} [data-plain-lyrics]`, { timeout: 6000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      await shot(page, '7c-lyrics-plain');
+      const plainText = await page.locator(`${P} [data-plain-lyrics]`).innerText().catch(() => '');
+      check(plainText.length > 200, 'plain .txt lyrics are shown', plainText.slice(0, 80));
+      check(!/Title:|Artist:|Album:|={5,}|Written by/.test(plainText), 'metadata header, separators and credits are not shown as lyrics', plainText.slice(0, 120));
+      check((plainText.match(/Verse 1, line one/g) || []).length === 1 && /Hold on\.\.\.\nHold on\.\.\./.test(plainText.replace(/\n+/g, '\n')), 'real lines and repeated lines are kept');
+      const plain = await page.evaluate((s) => {
+        const box = document.querySelector(`${s} [data-kind="plain"]`);
+        const ps = [...box.querySelectorAll('[data-plain-lyrics] p')].slice(1);
+        const cs = ps.map((p) => getComputedStyle(p));
+        const bt = box.getBoundingClientRect();
+        return { weights: [...new Set(cs.map((c) => c.fontWeight))], colors: [...new Set(cs.map((c) => c.color))], opacities: [...new Set(cs.map((c) => c.opacity))], lh: parseFloat(cs[0].lineHeight) / parseFloat(cs[0].fontSize), scrollable: box.scrollHeight > box.clientHeight + 40, boxTop: bt.top };
+      }, P);
+      check(plain.weights.length === 1 && Number(plain.weights[0]) === 500, 'unsynced lyrics use medium weight', JSON.stringify(plain.weights));
+      check(plain.colors.length === 1 && plain.opacities.length === 1 && plain.opacities[0] === '1', 'every unsynced line is equally readable (same colour, no fading)', JSON.stringify(plain));
+      check(plain.lh >= 1.5, `comfortable line spacing (${plain.lh.toFixed(2)})`);
+      check(plain.scrollable, 'the lyrics area scrolls on its own');
+      const before = await page.evaluate((s) => Math.round(document.querySelector(`${s} [data-kind="plain"]`).scrollTop), P);
+      await page.evaluate((s) => { const b = document.querySelector(`${s} [data-kind="plain"]`); b.scrollTop = 400; }, P);
+      await page.waitForTimeout(1200);
+      const ops1 = await page.evaluate((s) => [...document.querySelectorAll(`${s} [data-plain-lyrics] p`)].map((p) => getComputedStyle(p).opacity).join(), P);
+      await page.waitForTimeout(1500); // playback keeps going: nothing about the lines may change
+      const after = await page.evaluate((s) => Math.round(document.querySelector(`${s} [data-kind="plain"]`).scrollTop), P);
+      const ops2 = await page.evaluate((s) => [...document.querySelectorAll(`${s} [data-plain-lyrics] p`)].map((p) => getComputedStyle(p).opacity).join(), P);
+      check(before === 0 && after === 400 && ops1 === ops2, 'unsynced lyrics are not moved or faded by playback; manual scrolling sticks', JSON.stringify({ before, after }));
+      await noOverflow(page, P, 'plain lyrics (long line wraps)');
+      // bottom of the lyrics is reachable and not hidden behind the playback controls
+      await page.evaluate((s) => { const b = document.querySelector(`${s} [data-kind="plain"]`); b.scrollTop = b.scrollHeight; }, P);
+      await page.waitForTimeout(300);
+      const endGeo = await page.evaluate((s) => {
+        const box = document.querySelector(`${s} [data-kind="plain"]`), r = box.getBoundingClientRect();
+        const ps = box.querySelectorAll('[data-plain-lyrics] p'); const last = ps[ps.length - 1].getBoundingClientRect();
+        const ctl = document.querySelector(`${s} [aria-label="Pause"], ${s} [aria-label="Play"]`).getBoundingClientRect();
+        return { lastBottom: last.bottom, boxBottom: r.bottom, ctlTop: ctl.top };
+      }, P);
+      check(endGeo.lastBottom <= endGeo.boxBottom + 1 && endGeo.boxBottom <= endGeo.ctlTop + 1, 'last lyric line ends above the playback controls', JSON.stringify(endGeo));
       // plain embedded lyrics + empty state
       await page.click(`${P} [aria-label="Next track"]`);
       await page.waitForTimeout(900);

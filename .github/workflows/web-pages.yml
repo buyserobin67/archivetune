@@ -2,7 +2,7 @@ name: Cadence Web (build, test, deploy to GitHub Pages)
 
 on:
   push:
-    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, main]
+    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, main]
     paths: ["web/**", ".github/workflows/web-pages.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web-pages.yml"]

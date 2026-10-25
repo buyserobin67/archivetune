@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
-import { currentLineIndex } from '../lib/lrc';
+import { currentLineIndex, displayLyrics, INTERLUDE_MIN, lineSpan, stanzas } from '../lib/lrc';
 import { readLyricFile, saveLyricsText } from '../lib/lyrics';
 import { getPlayer, usePlaybackTime } from '../lib/player';
 import { prefersReducedMotion, ui } from '../lib/ui';
-import type { Track } from '../lib/types';
+import type { LyricLine, Track } from '../lib/types';
 import { QuoteIcon } from './Icons';
 import { Sheet } from './Sheets';
 
@@ -41,26 +41,16 @@ export function PasteLyricsSheet({ track, onClose }: { track: Track; onClose: ()
   );
 }
 
-/** Full-height lyrics: current line prominent, neighbours dimmed, smooth auto-scroll, tap a line to seek. */
+const FADE = 'linear-gradient(to bottom, transparent, #000 7%, #000 90%, transparent)';
+const scroller = 'scroll-y hide-scroll relative min-h-0 flex-1 overscroll-contain px-gutter';
+
+/** Lyrics area. Synced: active line lit, others dim, follows playback, tap to seek. Plain: even, calm reading text that never reacts to playback. */
 export function LyricsView({ track }: { track: Track }) {
-  const lyrics = useLiveQuery(() => db.lyrics.get(track.id).then((l) => l ?? null), [track.id]);
-  const { currentTime } = usePlaybackTime();
-  const box = useRef<HTMLDivElement>(null);
-  const holdUntil = useRef(0);
+  const stored = useLiveQuery(() => db.lyrics.get(track.id).then((l) => l ?? null), [track.id]);
+  // Cleaned on read: lyrics saved before the cleaner existed lose their Title/Artist/Album headers without being rewritten.
+  const lyrics = useMemo(() => (stored ? displayLyrics(stored) : stored), [stored]);
   const [paste, setPaste] = useState(false);
   const picker = useLyricFilePicker(track);
-  const lines = lyrics?.kind === 'synced' ? lyrics.lines ?? [] : [];
-  const idx = currentLineIndex(lines, currentTime);
-
-  useEffect(() => {
-    const c = box.current;
-    if (!c || idx < 0 || Date.now() < holdUntil.current) return;
-    const line = c.querySelector<HTMLElement>(`[data-line="${idx}"]`);
-    if (!line) return;
-    c.scrollTo({ top: line.offsetTop - c.clientHeight / 2 + line.clientHeight / 2, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
-  }, [idx, track.id, lyrics?.kind]);
-
-  useEffect(() => { box.current?.scrollTo({ top: 0 }); }, [track.id]);
 
   if (lyrics === undefined) return <div className="min-h-0 flex-1" />;
   if (lyrics === null) {
@@ -78,38 +68,72 @@ export function LyricsView({ track }: { track: Track }) {
       </div>
     );
   }
+  return lyrics.kind === 'synced'
+    ? <SyncedLyrics key={track.id} trackId={track.id} lines={lyrics.lines ?? []} />
+    : <PlainLyrics key={track.id} text={lyrics.text ?? ''} />;
+}
+
+/** Plain text. Deliberately does not read playback time: nothing here can change, fade or move while a song plays. */
+function PlainLyrics({ text }: { text: string }) {
+  return (
+    <div className={scroller} data-kind="plain" aria-label="Lyrics" style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
+      <article className="pb-10 pt-6" data-plain-lyrics>
+        <p className="mb-5 text-caption uppercase tracking-wider text-fg-3">Lyrics · not time-synced</p>
+        <div className="space-y-7">
+          {stanzas(text).map((st, n) => (
+            <div key={n} className="space-y-1.5 text-[1.0625rem] font-medium leading-[1.65] text-fg/90">
+              {st.map((line, k) => <p key={k} className="break-words">{line}</p>)}
+            </div>
+          ))}
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function SyncedLyrics({ trackId, lines }: { trackId: string; lines: LyricLine[] }) {
+  const { currentTime } = usePlaybackTime();
+  const idx = currentLineIndex(lines, currentTime);
+  const box = useRef<HTMLDivElement>(null);
+  const holdUntil = useRef(0);
+  const reduce = prefersReducedMotion();
+
+  useEffect(() => {
+    const c = box.current;
+    if (!c || idx < 0 || Date.now() < holdUntil.current) return;
+    const line = c.querySelector<HTMLElement>(`[data-line="${idx}"]`);
+    if (!line) return;
+    c.scrollTo({ top: line.offsetTop - c.clientHeight * 0.38 + line.clientHeight / 2, behavior: reduce ? 'auto' : 'smooth' });
+  }, [idx, trackId, reduce]);
+
   const hold = () => { holdUntil.current = Date.now() + 3500; };
   return (
-    <div
-      ref={box}
-      className="scroll-y hide-scroll relative min-h-0 flex-1 px-gutter"
-      onTouchStart={hold} onTouchMove={hold} onWheel={hold}
-      style={{ maskImage: 'linear-gradient(to bottom, transparent, #000 12%, #000 80%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 12%, #000 80%, transparent)' }}
-      aria-label="Lyrics"
-    >
-      <div className="h-[34%]" aria-hidden="true" />
-      {lyrics.kind === 'synced' ? (
-        <ol className="space-y-4 pb-2">
-          {lines.map((l, i) => (
+    <div ref={box} className={scroller} data-kind="synced" aria-label="Lyrics" onTouchStart={hold} onTouchMove={hold} onWheel={hold} style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
+      <div className="h-[30%]" aria-hidden="true" />
+      <ol className="space-y-5 pb-2">
+        {lines.map((l, i) => {
+          const active = i === idx;
+          const gap = !l.text;
+          const interlude = gap && lineSpan(lines, i) > INTERLUDE_MIN;
+          return (
             <li key={i} data-line={i}>
-              {l.text ? (
+              {!gap ? (
                 <button
-                  className="block w-full origin-left text-left text-title-lg font-extrabold leading-tight transition-[opacity,transform] duration-slow ease-out"
-                  style={{ opacity: i === idx ? 1 : Math.abs(i - idx) === 1 ? 0.5 : 0.28, transform: i === idx ? 'scale(1)' : 'scale(.92)' }}
-                  aria-current={i === idx ? 'true' : undefined}
+                  className="block w-full origin-left break-words text-left text-title-lg font-semibold leading-snug"
+                  style={{ opacity: active ? 1 : 0.34, transition: reduce ? 'none' : 'opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out)', transform: !reduce && !active ? 'scale(.96)' : undefined }}
+                  aria-current={active ? 'true' : undefined}
                   onClick={() => getPlayer().seek(l.t)}
                 >{l.text}</button>
-              ) : <div className="h-4" aria-hidden="true" />}
+              ) : interlude ? (
+                <div className="flex h-8 items-center gap-1.5" data-interlude role="img" aria-label="Instrumental" style={{ opacity: active ? 0.9 : 0.18, transition: reduce ? 'none' : 'opacity var(--dur-slow)' }}>
+                  {[0, 1, 2].map((d) => <span key={d} className={`h-2 w-2 rounded-full bg-fg ${active && !reduce ? 'animate-pulse' : ''}`} style={{ animationDelay: `${d * 200}ms` }} />)}
+                </div>
+              ) : <div className="h-3" aria-hidden="true" />}
             </li>
-          ))}
-        </ol>
-      ) : (
-        <div>
-          <p className="mb-3 text-caption text-fg-3">Not time-synced</p>
-          <p className="whitespace-pre-wrap text-title font-bold leading-snug text-fg/90">{lyrics.text}</p>
-        </div>
-      )}
-      <div className="h-[40%]" aria-hidden="true" />
+          );
+        })}
+      </ol>
+      <div className="h-[45%]" aria-hidden="true" />
     </div>
   );
 }
