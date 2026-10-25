@@ -18,6 +18,12 @@ export interface Track {
   album: string;
   duration: number;
   trackNo?: number;
+  /** Disc number from the tags, for albums spread over several discs. */
+  discNo?: number;
+  /** ReplayGain from the tags, in dB. Absent when the file has none. */
+  gain?: { track?: number; album?: number };
+  /** Which tag-reading pass this row has been through (see backfill.ts). undefined = before disc/gain support. */
+  tagsV?: number;
   mime: string;
   size: number;
   fileName: string;
@@ -57,10 +63,19 @@ export interface Setting {
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
+export interface LyricWord {
+  /** Seconds from the start of the track. */
+  t: number;
+  /** The word with its trailing space, so joining the words gives the line back. */
+  text: string;
+}
+
 export interface LyricLine {
   /** Seconds from the start of the track. */
   t: number;
   text: string;
+  /** Per-word timing from an enhanced LRC (`<mm:ss.xx>` tags). */
+  words?: LyricWord[];
 }
 
 /** Lyrics supplied by the user: embedded in the file, an LRC/TXT sidecar, or pasted. Never fetched from a server. */
@@ -70,6 +85,8 @@ export interface Lyrics {
   lines?: LyricLine[];
   text?: string;
   source: 'embedded' | 'lrc' | 'manual';
+  /** User timing nudge in seconds. Positive shows each line later. */
+  offset?: number;
 }
 
 export interface ParsedMeta {
@@ -80,6 +97,8 @@ export interface ParsedMeta {
   album?: string;
   duration?: number;
   trackNo?: number;
+  discNo?: number;
+  gain?: { track?: number; album?: number };
   art?: Blob;
 }
 

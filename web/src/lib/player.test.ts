@@ -215,3 +215,69 @@ describe('sleep timer', () => {
     expect(player.getState().track?.id).toBe(ids[0]);
   });
 });
+
+describe('polish: prefetch, levelling, stale resume', () => {
+  it('reads the next song shortly before the end and plays it without another database read', async () => {
+    const { db, audio, player, ids } = await setup(2);
+    await player.playQueue(ids, 0);
+    audio.currentTime = audio.duration - 5;
+    audio.dispatchEvent(new Event('timeupdate'));
+    await tick(20);
+    const get = vi.spyOn(db.blobs, 'get');
+    audio.finish();
+    await tick(20);
+    expect(player.getState().track?.id).toBe(ids[1]);
+    expect(get).not.toHaveBeenCalled();
+    expect(audio.playCalls).toBe(2);
+  });
+
+  it('turns loud tagged tracks down and leaves untagged ones alone', async () => {
+    const db = makeDb();
+    const { added } = await importFiles([audioFile('a.mp3', 'A'), audioFile('b.mp3', 'B')], { db, parse: async (_f, n) => (n === 'a.mp3' ? { gain: { track: -6, album: -9 } } : {}) });
+    const audio = new FakeAudio();
+    const player = new Player({ audio: audio.asAudio(), db, levelling: 'track' });
+    await player.playQueue(added.map((t) => t.id), 0);
+    expect(audio.volume).toBeCloseTo(10 ** (-6 / 20));
+    player.setLevelling('album');
+    expect(audio.volume).toBeCloseTo(10 ** (-9 / 20));
+    player.setLevelling('off');
+    expect(audio.volume).toBe(1);
+    player.setLevelling('track');
+    await player.next();
+    expect(audio.volume).toBe(1);
+  });
+
+  it('reloads the song at the same spot after a long pause in the background', async () => {
+    const db = makeDb();
+    const { added } = await importFiles([audioFile('a.mp3', 'A')], { db, parse: fakeParser() });
+    const audio = new FakeAudio();
+    let hidden = false, now = 1_000_000;
+    const fns: (() => void)[] = [];
+    const player = new Player({ audio: audio.asAudio(), db, now: () => now, visibility: { hidden: () => hidden, onChange: (fn) => fns.push(fn) } });
+    await player.playQueue([added[0].id], 0);
+    audio.currentTime = 42;
+    player.pause();
+    const src = audio.src;
+    hidden = true; fns.forEach((f) => f());
+    now += 60_000;
+    hidden = false; fns.forEach((f) => f());
+    await player.play();
+    expect(audio.src).not.toBe(src);
+    expect(player.getState().isPlaying).toBe(true);
+    // a short pause plays straight on
+    player.pause();
+    const src2 = audio.src;
+    now += 5_000;
+    await player.play();
+    expect(audio.src).toBe(src2);
+  });
+
+  it('undoes a queue removal', async () => {
+    const { player, ids } = await setup(3);
+    await player.playQueue(ids, 0);
+    const before = player.getState().queue;
+    await player.removeFromQueue(2);
+    player.insertInQueue(2, ids[2], before.original.indexOf(ids[2]));
+    expect(player.getState().queue.items).toEqual(before.items);
+  });
+});

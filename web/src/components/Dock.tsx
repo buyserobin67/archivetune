@@ -3,6 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useUI } from '../lib/ui';
 import { HomeIcon, LibraryIcon, SearchIcon } from './Icons';
 import { MiniPlayer } from './MiniPlayer';
+import { ToastBubble } from './Toast';
+import { usePlayer } from '../lib/player';
 
 const TABS = [
   { to: '/', label: 'Home', Icon: HomeIcon, end: true },
@@ -28,7 +30,8 @@ function useKeyboardOpen(): boolean {
 export function Dock() {
   const ref = useRef<HTMLDivElement>(null);
   const keyboard = useKeyboardOpen();
-  const { toast } = useUI();
+  const { playerOpen } = useUI();
+  const hasTrack = !!usePlayer().track;
   const { pathname } = useLocation();
 
   // Publish the dock height so scroll areas can pad themselves exactly.
@@ -48,11 +51,8 @@ export function Dock() {
       className="absolute inset-x-0 bottom-0 z-30 pt-4 transition-transform duration-slow ease-out"
       style={{ transform: keyboard ? 'translateY(120%)' : undefined, background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}
     >
-      {toast && (
-        <div key={toast.id} className="pointer-events-none absolute inset-x-0 bottom-full flex justify-center px-4 pb-2" role="status" aria-live="polite">
-          <div className="animate-pop max-w-full rounded-full bg-fg px-4 py-2 text-footnote font-medium text-black shadow-float">{toast.text}</div>
-        </div>
-      )}
+      {/* With a mini-player the toast shows inside it; without one it sits just above the tab bar. */}
+      {!hasTrack && !playerOpen && <ToastBubble className="absolute inset-x-0 bottom-full px-4 pb-2" />}
       <MiniPlayer />
       <nav aria-label="Primary" className="px-3" style={{ paddingBottom: 'calc(var(--sab) * 0.6 + 0.5rem)' }}>
         <ul className="mx-auto flex max-w-md rounded-xl bg-s1 px-1 shadow-float">

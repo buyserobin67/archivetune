@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { importFile, importFiles } from './library';
 import { StorageQuotaError, isQuotaError } from './errors';
-import { classify, formatBytes, formatTime, getStorageStatus, requestPersistence } from './storage';
+import { classify, formatBytes, formatRemaining, formatTime, getStorageStatus, requestPersistence } from './storage';
 import { audioFile, fakeParser, makeDb } from '../test/helpers';
 
 const quota = () => new DOMException('The quota has been exceeded.', 'QuotaExceededError');
@@ -102,5 +102,13 @@ describe('storage indicator', () => {
     expect(formatTime(75)).toBe('1:15');
     expect(formatTime(3725)).toBe('1:02:05');
     expect(formatTime(NaN)).toBe('0:00');
+  });
+
+  it('rounds the remaining time up so it only reads -0:00 at the end', () => {
+    expect(formatRemaining(5, 4.4)).toBe('-0:01');
+    expect(formatRemaining(5, 5)).toBe('-0:00');
+    expect(formatRemaining(200, 0)).toBe('-3:20');
+    expect(formatRemaining(200, 0.2)).toBe('-3:20');
+    expect(formatRemaining(10, 12)).toBe('-0:00');
   });
 });

@@ -1,21 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import * as Q from '../lib/queue';
 import { db } from '../lib/db';
 import { toggleFavorite } from '../lib/library';
 import { removeLyrics } from '../lib/lyrics';
+import { clampOffset } from '../lib/lrc';
 import { useArtThumb, useGlobalAccent } from '../lib/accent';
 import { getPlayer, usePlayer, usePlaybackTime } from '../lib/player';
+import { haptic } from '../lib/haptics';
+import { useTracks } from '../lib/hooks';
+import { similarTo } from '../lib/similar';
 import { rgbCss, type Palette } from '../lib/palette';
-import { formatTime } from '../lib/storage';
+import { formatRemaining, formatTime } from '../lib/storage';
 import { supportsViewTransitions, ui, useUI } from '../lib/ui';
 import type { Track } from '../lib/types';
 import { Art } from './Art';
 import { LyricsView, PasteLyricsSheet, useLyricFilePicker } from './LyricsView';
+import { SeekBar } from './SeekBar';
 import { Sheet, SheetItem } from './Sheets';
+import { ToastBubble } from './Toast';
 import {
-  ChevronDown, DownIcon, HeartIcon, MoonIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, QueueIcon,
-  QuoteIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, TrashIcon, UpIcon,
+  ChevronDown, GripIcon, HeartIcon, MoonIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PlusIcon, PrevIcon, QueueIcon,
+  QuoteIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, TimingIcon, TrashIcon,
 } from './Icons';
 
 const DISMISS_DISTANCE = 130;
@@ -77,6 +83,7 @@ export function NowPlaying() {
       const dismiss = d.dy > DISMISS_DISTANCE || (v > DISMISS_VELOCITY && d.dy > 30);
       el.style.transition = 'transform .32s cubic-bezier(.2,.8,.2,1), border-radius .32s';
       if (dismiss) {
+        haptic();
         el.style.transform = 'translateY(105%)';
         window.setTimeout(() => ui.closePlayer(false), 300);
       } else {
@@ -105,6 +112,7 @@ export function NowPlaying() {
       } as React.CSSProperties}
     >
       <Backdrop palette={palette} trackId={t?.hasArt ? t.id : undefined} blur={playerTab === 'lyrics'} />
+      {open && <ToastBubble className="absolute inset-x-0 z-10 px-4" style={{ top: 'calc(var(--sat) + 3.75rem)' }} />}
       {t && (
         <div className="relative flex min-h-0 flex-1 flex-col">
           {playerTab === 'now' && <NowTab track={t} touch={touch} />}
@@ -121,7 +129,7 @@ function Header({ eyebrow, title, touch, left, right }: { eyebrow: string; title
   return (
     <header className="relative shrink-0 px-gutter pb-2" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)', touchAction: 'none' }} onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd}>
       <div className="flex items-center justify-between gap-2">
-        {left ?? <CircleButton label="Close player" onClick={() => ui.closePlayer()}><ChevronDown size={22} /></CircleButton>}
+        {left ?? <CircleButton label="Close player" onClick={() => { haptic(); ui.closePlayer(); }}><ChevronDown size={22} /></CircleButton>}
         <div className="min-w-0 flex-1 text-center">
           <div className="eyebrow truncate">{eyebrow}</div>
           <div className="truncate text-footnote font-semibold">{title}</div>
@@ -149,7 +157,11 @@ function NowTab({ track, touch }: { track: Track; touch: Touchy }) {
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-gutter" style={{ touchAction: 'none', ['--cw' as string]: 'min(100%, 20rem)' }} onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd}>
         {/* my-auto centres the group when there is room and lets it scroll (instead of overlapping the controls) when text is very large. */}
         <div className="my-auto flex w-full flex-col items-center gap-4 py-2">
-        <div className="w-[min(var(--cw),42dvh,max(7.5rem,calc(100dvh-22rem-var(--sat)-var(--sab))))] transition-transform duration-slow ease-spring" style={{ transform: s.isPlaying ? 'scale(1)' : 'scale(.92)' }}>
+        {/* Resuming springs back with a small overshoot; pausing settles without one. Durations follow the motion tokens, so reduced motion turns this off. */}
+        <div className="w-[min(var(--cw),42dvh,max(7.5rem,calc(100dvh-22rem-var(--sat)-var(--sab))))]" style={{
+          transform: s.isPlaying ? 'scale(1)' : 'scale(.92)',
+          transition: s.isPlaying ? 'transform calc(var(--dur-slow) * 1.35) cubic-bezier(.28, 1.7, .42, 1)' : 'transform var(--dur-slow) var(--ease-out)',
+        }} data-cover>
           <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-xl" vtName={playerOpen ? 'cadence-art' : undefined} shadow priority />
         </div>
         <div className="flex w-[var(--cw)] items-center gap-2" style={{ touchAction: 'auto' }}>
@@ -158,7 +170,7 @@ function NowTab({ track, touch }: { track: Track; touch: Touchy }) {
             <div className="truncate text-body text-fg-2">{track.artist}</div>
             {track.license && <div className="truncate text-caption text-fg-3">{track.license.name} · {track.license.attribution}</div>}
           </div>
-          <CircleButton label={fav ? 'Remove from favorites' : 'Add to favorites'} pressed={!!fav} onClick={() => void toggleFavorite(track.id)}><HeartIcon size={18} filled={!!fav} /></CircleButton>
+          <CircleButton label={fav ? 'Remove from favorites' : 'Add to favorites'} pressed={!!fav} onClick={() => { haptic(); void toggleFavorite(track.id); }}><HeartIcon size={18} filled={!!fav} /></CircleButton>
           <CircleButton label="More actions" onClick={() => ui.openTrackSheet(track.id)}><MoreIcon size={18} /></CircleButton>
         </div>
         </div>
@@ -172,32 +184,49 @@ function QueueTab({ track, touch }: { track: Track; touch: Touchy }) {
   const s = usePlayer();
   const p = getPlayer();
   const tracks = useLiveQuery(() => db.tracks.bulkGet(s.queue.items), [s.queue.items]);
+  const library = useTracks();
   const { items, index, repeat } = s.queue;
   const [showHistory, setShowHistory] = useState(false);
+  const [drag, setDrag] = useState<{ from: number; dy: number; h: number } | null>(null);
   const after = Q.afterCurrent(s.queue);
   const nextCount = Q.upcoming(s.queue).length;
   const byIndex = (i: number) => tracks?.[i] ?? null;
   const title = (i: number) => byIndex(i)?.title ?? 'this song';
+  // Same album, artist, genre, then mood: offered only when the queue is about to stop and something real matches.
+  const similar = useMemo(() => (after.kind === 'stop' && library ? similarTo(track, library, items) : []), [after.kind, library, track, items]);
+
+  const target = drag ? Math.min(items.length - 1, Math.max(index + 1, drag.from + Math.round(drag.dy / drag.h))) : -1;
+  const shiftFor = (i: number) => {
+    if (!drag || i === drag.from) return 0;
+    if (drag.from < target && i > drag.from && i <= target) return -drag.h;
+    if (drag.from > target && i >= target && i < drag.from) return drag.h;
+    return 0;
+  };
+  const removeWithUndo = (i: number) => {
+    const id = items[i];
+    const originalAt = s.queue.original.indexOf(id);
+    const name = title(i);
+    haptic();
+    void p.removeFromQueue(i);
+    ui.toast(`Removed “${name}”`, { label: 'Undo', run: () => p.insertInQueue(i, id, originalAt) });
+  };
+
   const row = (i: number, opts: { controls: boolean; dim?: boolean }) => {
     const t = byIndex(i);
     if (!t) return null;
+    const dragging = drag?.from === i;
+    const shift = dragging ? drag.dy : shiftFor(i);
     return (
-      <div key={`${items[i]}:${i}`} className={`flex items-center gap-1 pl-gutter pr-1 ${opts.dim ? 'opacity-55' : ''}`}>
-        <button className="press flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left" onClick={() => void p.playIndex(i)}>
-          <Art trackId={t.hasArt ? t.id : undefined} seed={`${t.album}|${t.artist}`} className="h-10 w-10" rounded="rounded-md" />
-          <div className="min-w-0">
-            <div className="truncate text-body font-medium">{t.title}</div>
-            <div className="truncate text-caption text-fg-2">{t.artist}</div>
-          </div>
-        </button>
-        {opts.controls && (
-          <>
-            <button className="press tap text-fg-3 disabled:opacity-20" disabled={i <= index + 1} onClick={() => p.moveInQueue(i, i - 1)} aria-label={`Move ${t.title} up`}><UpIcon size={18} /></button>
-            <button className="press tap text-fg-3 disabled:opacity-20" disabled={i === items.length - 1} onClick={() => p.moveInQueue(i, i + 1)} aria-label={`Move ${t.title} down`}><DownIcon size={18} /></button>
-            <button className="press tap text-fg-3" onClick={() => void p.removeFromQueue(i)} aria-label={`Remove ${t.title} from queue`}><TrashIcon size={18} /></button>
-          </>
-        )}
-      </div>
+      <QueueRow
+        key={`${items[i]}:${i}`} track={t} dim={opts.dim} controls={opts.controls} dragging={dragging}
+        style={{ transform: shift ? `translateY(${shift}px)` : undefined, transition: drag && !dragging ? 'transform var(--dur) var(--ease-out)' : 'none', zIndex: dragging ? 2 : undefined }}
+        onPlay={() => void p.playIndex(i)}
+        onRemove={() => removeWithUndo(i)}
+        onDragStart={(h) => { haptic(); setDrag({ from: i, dy: 0, h }); }}
+        onDragMove={(dy) => setDrag((d) => (d ? { ...d, dy } : d))}
+        onDragEnd={() => { if (target >= 0 && target !== i) p.moveInQueue(i, target); setDrag(null); }}
+        onStep={(dir) => { const to = i + dir; if (to > index && to < items.length) p.moveInQueue(i, to); }}
+      />
     );
   };
   return (
@@ -218,7 +247,7 @@ function QueueTab({ track, touch }: { track: Track; touch: Touchy }) {
           <h3 className="eyebrow">Up next{nextCount ? ` · ${nextCount}` : ''}</h3>
           {nextCount > 0 && <button className="press text-footnote font-semibold" onClick={() => p.clearUpcoming()}>Clear</button>}
         </div>
-        <div className="scroll-y hide-scroll relative min-h-0 flex-1" style={{ maskImage: 'linear-gradient(to bottom, transparent, #000 0.5rem, #000 calc(100% - 0.75rem), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 0.5rem, #000 calc(100% - 0.75rem), transparent)' }}>
+        <div className="scroll-y hide-scroll relative min-h-0 flex-1" style={{ overflowY: drag ? 'hidden' : undefined, maskImage: 'linear-gradient(to bottom, transparent, #000 0.5rem, #000 calc(100% - 0.75rem), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 0.5rem, #000 calc(100% - 0.75rem), transparent)' }}>
           {after.kind === 'repeat-one' && <p className="px-gutter py-2 text-footnote text-fg-2">Repeating “{track.title}”. Turn repeat off to continue to the next song.</p>}
           {nextCount === 0 && after.kind !== 'repeat-one' && (
             <p className="px-gutter py-2 text-footnote text-fg-2">
@@ -226,6 +255,15 @@ function QueueTab({ track, touch }: { track: Track; touch: Touchy }) {
                 ? after.same ? `Repeat is on: “${track.title}” will play again.` : `Nothing else is queued. Repeat is on, so playback returns to “${title(0)}”.`
                 : 'Nothing queued after this song. Add songs from the ••• menu.'}
             </p>
+          )}
+          {similar.length > 0 && (
+            <div className="px-gutter pb-2 pt-1">
+              <button className="press flex h-10 items-center gap-2 rounded-full bg-white/[0.09] px-4 text-footnote font-semibold"
+                onClick={() => { p.enqueue(similar.map((x) => x.id)); ui.toast(`Added ${similar.length} similar song${similar.length === 1 ? '' : 's'}`); }}>
+                <PlusIcon size={16} /> Keep playing similar
+              </button>
+              <p className="mt-1.5 text-caption text-fg-3">From the same album, artist or genre in your library.</p>
+            </div>
           )}
           {Q.upcoming(s.queue).map((_, k) => row(index + 1 + k, { controls: true }))}
           {repeat === 'all' && nextCount > 0 && <p className="px-gutter py-2 text-caption text-fg-3">Then repeats from “{title(0)}”.</p>}
@@ -246,10 +284,79 @@ function QueueTab({ track, touch }: { track: Track; touch: Touchy }) {
   );
 }
 
+const SWIPE_REMOVE = 0.35; // of the row width
+
+/** One queue entry. Upcoming entries drag by the handle to reorder and swipe left to remove. */
+function QueueRow({ track: t, dim, controls, dragging, style, onPlay, onRemove, onDragStart, onDragMove, onDragEnd, onStep }: {
+  track: Track; dim?: boolean; controls: boolean; dragging: boolean; style: React.CSSProperties;
+  onPlay: () => void; onRemove: () => void; onDragStart: (rowHeight: number) => void; onDragMove: (dy: number) => void; onDragEnd: () => void; onStep: (dir: -1 | 1) => void;
+}) {
+  const el = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const handle = useRef({ y0: 0, id: -1 });
+  const swipe = useRef({ x0: 0, y0: 0, dx: 0, axis: '' as '' | 'x' | 'y' });
+
+  const onTouchStart = (e: React.TouchEvent) => { swipe.current = { x0: e.touches[0].clientX, y0: e.touches[0].clientY, dx: 0, axis: '' }; };
+  const onTouchMove = (e: React.TouchEvent) => {
+    const sw = swipe.current, c = content.current;
+    if (!controls || !c) return;
+    const dx = e.touches[0].clientX - sw.x0, dy = e.touches[0].clientY - sw.y0;
+    if (!sw.axis && Math.hypot(dx, dy) > 8) sw.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (sw.axis !== 'x') return;
+    sw.dx = Math.min(0, dx);
+    c.style.transition = 'none';
+    c.style.transform = `translateX(${sw.dx}px)`;
+  };
+  const onTouchEnd = () => {
+    const sw = swipe.current, c = content.current;
+    if (!c || sw.axis !== 'x') return;
+    window.setTimeout(() => { sw.axis = ''; }, 350); // only the click right after this swipe is swallowed
+    const gone = -sw.dx > c.offsetWidth * SWIPE_REMOVE;
+    c.style.transition = 'transform .24s var(--ease-out)';
+    c.style.transform = gone ? 'translateX(-100%)' : '';
+    if (gone) window.setTimeout(onRemove, 200);
+  };
+
+  return (
+    <div ref={el} className={`relative ${dim ? 'opacity-55' : ''}`} style={style} data-queue-row>
+      {controls && <div className="absolute inset-0 flex items-center justify-end bg-red-500/80 pr-gutter text-footnote font-semibold" aria-hidden="true">Remove</div>}
+      <div
+        ref={content}
+        className={`relative flex items-center gap-1 pl-gutter pr-1 ${controls ? 'bg-bg' : ''} ${dragging ? 'rounded-lg bg-s2 shadow-float' : ''}`}
+        style={{ touchAction: 'pan-y' }}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}
+        onClickCapture={(e) => { if (swipe.current.axis === 'x') { e.preventDefault(); e.stopPropagation(); swipe.current.axis = ''; } }}
+      >
+        <button className="press flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left" onClick={onPlay}>
+          <Art trackId={t.hasArt ? t.id : undefined} seed={`${t.album}|${t.artist}`} className="h-10 w-10" rounded="rounded-md" />
+          <div className="min-w-0">
+            <div className="truncate text-body font-medium">{t.title}</div>
+            <div className="truncate text-caption text-fg-2">{t.artist}</div>
+          </div>
+        </button>
+        {controls && (
+          <>
+            <button className="press tap text-fg-3" onClick={onRemove} aria-label={`Remove ${t.title} from queue`}><TrashIcon size={18} /></button>
+            <button
+              className="tap cursor-grab text-fg-3" style={{ touchAction: 'none' }} aria-label={`Reorder ${t.title}. Drag, or use the up and down arrow keys`}
+              onPointerDown={(e) => { handle.current = { y0: e.clientY, id: e.pointerId }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* old browsers */ } onDragStart(el.current?.offsetHeight ?? 52); }}
+              onPointerMove={(e) => { if (e.pointerId === handle.current.id) onDragMove(e.clientY - handle.current.y0); }}
+              onPointerUp={(e) => { if (e.pointerId === handle.current.id) { handle.current.id = -1; onDragEnd(); } }}
+              onPointerCancel={(e) => { if (e.pointerId === handle.current.id) { handle.current.id = -1; onDragEnd(); } }}
+              onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); onStep(e.key === 'ArrowUp' ? -1 : 1); } }}
+            ><GripIcon size={20} /></button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LyricsTab({ track, touch }: { track: Track; touch: Touchy }) {
   const [menu, setMenu] = useState(false);
   const [paste, setPaste] = useState(false);
-  const has = useLiveQuery(() => db.lyrics.get(track.id).then((l) => !!l), [track.id]);
+  const stored = useLiveQuery(() => db.lyrics.get(track.id).then((l) => l ?? null), [track.id]);
+  const has = !!stored;
   const picker = useLyricFilePicker(track);
   return (
     <>
@@ -265,11 +372,32 @@ function LyricsTab({ track, touch }: { track: Track; touch: Touchy }) {
         <Sheet title="Lyrics" onClose={() => setMenu(false)}>
           <SheetItem icon={<QuoteIcon size={20} />} label={has ? 'Replace from .lrc / .txt file' : 'Add .lrc / .txt file'} onClick={() => { setMenu(false); picker.open(); }} />
           <SheetItem icon={<QuoteIcon size={20} />} label="Paste lyrics" onClick={() => { setMenu(false); setPaste(true); }} />
+          {stored?.kind === 'synced' && <TimingNudge trackId={track.id} offset={stored.offset ?? 0} />}
           {has && <SheetItem danger icon={<TrashIcon size={20} />} label="Remove lyrics" onClick={async () => { await removeLyrics(track.id); setMenu(false); ui.toast('Lyrics removed'); }} />}
         </Sheet>
       )}
       {paste && <PasteLyricsSheet track={track} onClose={() => setPaste(false)} />}
     </>
+  );
+}
+
+/** Moves every synced line earlier or later in half-second steps, for files whose timing is a little off. */
+function TimingNudge({ trackId, offset }: { trackId: string; offset: number }) {
+  const set = (v: number) => { haptic(); void db.lyrics.update(trackId, { offset: clampOffset(v) }); };
+  const label = offset === 0 ? 'Matches the file' : `${Math.abs(offset).toFixed(1)} s ${offset > 0 ? 'later' : 'earlier'}`;
+  return (
+    <div className="flex min-h-[3.25rem] flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1.5" role="group" aria-label="Lyrics timing">
+      <span className="flex w-6 justify-center text-fg-2"><TimingIcon size={20} /></span>
+      <span className="min-w-[6rem] flex-1">
+        <span className="block text-body-lg">Timing</span>
+        <span className="block text-footnote text-fg-3" aria-live="polite" data-lyrics-offset>{label}</span>
+      </span>
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+      <button className="press h-9 rounded-full bg-s3 px-3 text-footnote font-semibold" onClick={() => set(offset - 0.5)} aria-label="Show lyrics half a second earlier">−0.5 s</button>
+      <button className="press h-9 rounded-full bg-s3 px-3 text-footnote font-semibold" onClick={() => set(offset + 0.5)} aria-label="Show lyrics half a second later">+0.5 s</button>
+      {offset !== 0 && <button className="press h-9 rounded-full px-2 text-footnote font-semibold text-fg-2" onClick={() => set(0)}>Reset</button>}
+      </span>
+    </div>
   );
 }
 
@@ -282,7 +410,7 @@ function SleepSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title="Sleep timer" onClose={onClose}>
       {SLEEP_OPTIONS.map(([v, label]) => (
-        <SheetItem key={String(v)} label={label} selected={v === null ? !s.sleepEndsAt && !s.sleepEndOfTrack : v === current} onClick={() => { p.setSleep(v); ui.toast(v === null ? 'Sleep timer off' : v === 'track' ? 'Stopping after this track' : `Stopping in ${label}`); onClose(); }} />
+        <SheetItem key={String(v)} label={label} selected={v === null ? !s.sleepEndsAt && !s.sleepEndOfTrack : v === current} onClick={() => { haptic(); p.setSleep(v); ui.toast(v === null ? 'Sleep timer off' : v === 'track' ? 'Stopping after this track' : `Stopping in ${label}`); onClose(); }} />
       ))}
     </Sheet>
   );
@@ -312,7 +440,6 @@ function Transport({ compact }: { compact?: boolean }) {
   const sleepLabel = useSleepLabel();
   const dur = duration || s.track?.duration || 0;
   const value = scrub ?? currentTime;
-  const pct = dur ? Math.min(100, (value / dur) * 100) : 0;
   const commit = () => { if (scrub !== null) { p.seek(scrub); setScrub(null); } };
   const { shuffle, repeat } = s.queue;
   const msg = s.error ?? (s.interrupted ? 'Playback was interrupted. Tap play to resume.' : null);
@@ -320,13 +447,8 @@ function Transport({ compact }: { compact?: boolean }) {
   return (
     <div className="relative shrink-0 px-gutter" style={{ paddingBottom: 'calc(var(--sab) + 0.75rem)' }}>
       <div className="mx-auto w-full max-w-[26rem]">
-        <input
-          type="range" className="seek" min={0} max={dur || 1} step={0.1} value={Math.min(value, dur || 1)}
-          style={{ ['--p' as string]: `${pct}%` }} aria-label="Seek" aria-valuetext={`${formatTime(value)} of ${formatTime(dur)}`}
-          onChange={(e) => setScrub(Number(e.target.value))}
-          onPointerUp={commit} onTouchEnd={commit} onKeyUp={commit} onBlur={commit}
-        />
-        <div className="-mt-1 flex justify-between text-caption tabular-nums text-fg-2"><span>{formatTime(value)}</span><span>-{formatTime(Math.max(dur - value, 0))}</span></div>
+        <SeekBar value={value} duration={dur} onScrub={setScrub} onCommit={commit} />
+        <div className="-mt-1 flex justify-between text-caption tabular-nums text-fg-2"><span>{formatTime(value)}</span><span>{formatRemaining(dur, value)}</span></div>
         {msg && <p className="mt-1 text-center text-caption text-fg-2" role="status">{msg}</p>}
 
         {compact ? (
@@ -363,7 +485,7 @@ function PlayButton({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
   return (
     <button
       className={`press flex items-center justify-center bg-fg text-black shadow-float ${lg ? 'h-[min(4.5rem,19vw)] w-[min(4.5rem,19vw)] rounded-[min(1.375rem,6vw)]' : 'h-14 w-14 rounded-xl'}`}
-      onClick={() => void p.toggle()} aria-label={s.isPlaying ? 'Pause' : 'Play'}
+      onClick={() => { haptic(); void p.toggle(); }} aria-label={s.isPlaying ? 'Pause' : 'Play'}
     >
       {s.isPlaying ? <PauseIcon size={lg ? 32 : 26} /> : <PlayIcon size={lg ? 32 : 26} className="ml-0.5" />}
     </button>

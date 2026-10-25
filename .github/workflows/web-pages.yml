@@ -2,7 +2,7 @@ name: Cadence Web (build, test, deploy to GitHub Pages)
 
 on:
   push:
-    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, claude/cadence-web-features, claude/cadence-web-standalone-fix, claude/cadence-web-standalone-hotfix, main]
+    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, claude/cadence-web-features, claude/cadence-web-standalone-fix, claude/cadence-web-standalone-hotfix, claude/cadence-web-polish, main]
     paths: ["web/**", ".github/workflows/web-pages.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web-pages.yml"]
@@ -57,6 +57,12 @@ jobs:
 
       - name: Browser E2E
         run: npm run e2e
+        env:
+          E2E_BASE: /${{ github.event.repository.name }}/
+
+      # Toasts, long-press menus, scrubbing, queue drag/swipe/undo, keep playing similar, karaoke, recap image, discs.
+      - name: Polish interactions
+        run: npm run e2e:polish
         env:
           E2E_BASE: /${{ github.event.repository.name }}/
 

@@ -6,6 +6,9 @@ import { sha256Hex } from './hash';
 import { guessMime, looksLikeAudio, parseTags, titleFromFileName, type MetaParser } from './metadata';
 import type { LicenseInfo, Track } from './types';
 
+/** Bump when the importer starts reading a new tag, so backfill.ts re-reads older rows once. 2 = disc number + ReplayGain. */
+export const TAGS_V = 2;
+
 export interface ImportOptions {
   db?: CadenceDB;
   parse?: MetaParser;
@@ -51,6 +54,9 @@ export async function importFile(file: File | Blob, name: string, opts: ImportOp
     album: meta.album?.trim() || 'Unknown Album',
     duration: Number.isFinite(meta.duration) ? (meta.duration as number) : 0,
     trackNo: meta.trackNo,
+    discNo: meta.discNo,
+    gain: meta.gain,
+    tagsV: TAGS_V,
     mime: guessMime(f),
     size: file.size,
     fileName: name,
@@ -158,6 +164,10 @@ export interface Group {
   artTrackId?: string;
 }
 
+/** Disc, then track number, then title. Tracks without numbers go last. */
+export const albumOrder = (a: Track, b: Track) =>
+  (a.discNo ?? 1) - (b.discNo ?? 1) || (a.trackNo ?? 1e6) - (b.trackNo ?? 1e6) || a.title.localeCompare(b.title);
+
 export function groupAlbums(tracks: Track[]): Group[] {
   const map = new Map<string, Track[]>();
   for (const t of tracks) {
@@ -166,7 +176,7 @@ export function groupAlbums(tracks: Track[]): Group[] {
   }
   return [...map.entries()]
     .map(([key, list]) => {
-      list.sort((a, b) => (a.trackNo ?? 1e6) - (b.trackNo ?? 1e6) || a.title.localeCompare(b.title));
+      list.sort(albumOrder);
       return { key, name: list[0].album, subtitle: list[0].artist, trackIds: list.map((t) => t.id), artTrackId: list.find((t) => t.hasArt)?.id };
     })
     .sort((a, b) => a.name.localeCompare(b.name));

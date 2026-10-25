@@ -18,12 +18,20 @@ export const parseTags: MetaParser = async (file) => {
       album: m.common.album,
       duration: m.format.duration,
       trackNo: m.common.track?.no ?? undefined,
+      discNo: m.common.disk?.no ?? undefined,
+      gain: replayGain(m.common.replaygain_track_gain?.dB, m.common.replaygain_album_gain?.dB),
       art: pic ? new Blob([new Uint8Array(pic.data)], { type: pic.format || 'image/jpeg' }) : undefined,
     };
   } catch {
     return {};
   }
 };
+
+function replayGain(track: number | undefined, album: number | undefined): ParsedMeta['gain'] {
+  const ok = (v: number | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const g = { track: ok(track), album: ok(album) };
+  return g.track === undefined && g.album === undefined ? undefined : g;
+}
 
 type EmbeddedLyrics = { text?: string; syncText?: { text: string; timestamp?: number }[]; timeStampFormat?: number }[];
 

@@ -75,3 +75,19 @@ describe('tag backfill', () => {
     expect((await db.tracks.get(r.track.id))!.genre).toBe('');
   });
 });
+
+describe('tag backfill: disc number and ReplayGain', () => {
+  it('re-reads rows from before disc/gain support once, keeping the genre already read', async () => {
+    const db = makeDb();
+    const r = await importFile(audioFile('a.mp3', 'A'), 'a.mp3', { db, parse: async () => ({ title: 'a', genre: 'Jazz' }) });
+    if (r.status !== 'added') throw new Error();
+    await db.tracks.update(r.track.id, { tagsV: undefined });
+    const parse = fakeParser({ genre: 'Rock', discNo: 2, gain: { track: -7.5 } });
+    expect(await backfillTags({ db, parse })).toBe(1);
+    const t = (await db.tracks.get(r.track.id))!;
+    expect(t.genre).toBe('Jazz');
+    expect(t.discNo).toBe(2);
+    expect(t.gain).toEqual({ track: -7.5 });
+    expect(await backfillTags({ db, parse })).toBe(0);
+  });
+});

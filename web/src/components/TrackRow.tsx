@@ -2,14 +2,16 @@ import { memo } from 'react';
 import type { Track } from '../lib/types';
 import { ui } from '../lib/ui';
 import { usePlayer } from '../lib/player';
+import { useLongPress } from '../lib/longPress';
 import { Art } from './Art';
 import { HeartIcon, MoreIcon } from './Icons';
 
 export const TrackRow = memo(function TrackRow({ track, onPlay, trailing, index }: { track: Track; onPlay: () => void; trailing?: React.ReactNode; index?: number }) {
   const { track: cur, isPlaying } = usePlayer();
   const active = cur?.id === track.id;
+  const hold = useLongPress(() => ui.openTrackSheet(track.id));
   return (
-    <div className="cv-row flex items-center gap-1 pl-gutter pr-2">
+    <div className="cv-row hold flex items-center gap-1 pl-gutter pr-2" {...hold}>
       <button className="press flex min-w-0 flex-1 items-center gap-3 py-2 text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
         {index !== undefined && <span className="w-5 shrink-0 text-center text-footnote tabular-nums text-fg-3">{active && isPlaying ? '' : index + 1}</span>}
         <div className="relative">

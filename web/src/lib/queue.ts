@@ -65,6 +65,17 @@ export function removeAt(q: QueueState, index: number): QueueState {
   return { ...q, items, original, index: items.length ? idx : -1 };
 }
 
+/** Puts an entry back where it was (undo of `removeAt`). `originalAt` is its old place in the un-shuffled order. */
+export function insertAt(q: QueueState, index: number, id: string, originalAt = q.original.length): QueueState {
+  const at = Math.min(Math.max(index, 0), q.items.length);
+  const items = [...q.items];
+  items.splice(at, 0, id);
+  const original = [...q.original];
+  original.splice(Math.min(Math.max(originalAt, 0), original.length), 0, id);
+  const idx = q.index < 0 ? 0 : at <= q.index ? q.index + 1 : q.index;
+  return { ...q, items, original, index: idx };
+}
+
 export function move(q: QueueState, from: number, to: number): QueueState {
   const n = q.items.length;
   if (from === to || from < 0 || to < 0 || from >= n || to >= n) return q;

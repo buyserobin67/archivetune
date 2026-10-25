@@ -61,6 +61,15 @@ input[type='range'].seek { -webkit-appearance: none; appearance: none; height: 1
 input[type='range'].seek::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: linear-gradient(to right, rgb(255 255 255 / 0.92) var(--p, 0%), rgb(255 255 255 / 0.2) var(--p, 0%)); }
 input[type='range'].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.5); transition: transform var(--dur-fast) var(--ease-out); }
 input[type='range'].seek:active::-webkit-slider-thumb { transform: scale(1.35); }
+/* held: the bar grows and the handle with it (see SeekBar) */
+input[type='range'].seek::-webkit-slider-runnable-track { transition: height var(--dur-fast) var(--ease-out); }
+.seek-wrap[data-held] input[type='range'].seek::-webkit-slider-runnable-track { height: 7px; border-radius: 7px; }
+.seek-wrap[data-held] input[type='range'].seek::-webkit-slider-thumb { margin-top: -2.5px; transform: scale(1.4); }
+.seek-wrap[data-held] input[type='range'].seek::-moz-range-track, .seek-wrap[data-held] input[type='range'].seek::-moz-range-progress { height: 8px; }
+/* karaoke sweep on the sung lyric line (LyricsView); --k runs from -15% to 115% across each word */
+.karaoke { background-image: linear-gradient(90deg, var(--fg) calc(var(--k, -15%) - 15%), rgb(255 255 255 / 0.55) calc(var(--k, -15%) + 15%)); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* long-press targets: no iOS callout or text selection */
+.hold { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 input[type='range'].seek::-moz-range-track { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.2); }
 input[type='range'].seek::-moz-range-progress { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.92); }
 input[type='range'].seek::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }

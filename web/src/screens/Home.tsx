@@ -20,6 +20,8 @@ export default function Home() {
   const [mood, setMood] = useState<MoodId | null>(null);
   const week = useLiveQuery(() => db.plays.where('at').aboveOrEqual(Date.now() - 8 * 86_400_000).toArray(), []);
   const weekRecap = useMemo(() => computeRecap(week ?? [], 'week'), [week]);
+  // The recap card waits for the first counted listen: before that it would only advertise an empty screen.
+  const anyPlays = useLiveQuery(() => db.plays.limit(1).count().then((n) => n > 0), []);
 
   const data = useMemo(() => {
     const all = tracks ?? [];
@@ -71,12 +73,12 @@ export default function Home() {
         </div>
       )}
 
-      {!!tracks?.length && (
+      {!!tracks?.length && anyPlays && (
         <Link to="/recap" className="press mx-gutter mb-6 flex items-center justify-between rounded-xl bg-s1 p-4" aria-label="Open your listening recap">
           <span className="min-w-0">
             <span className="block text-caption uppercase tracking-wider text-fg-3">{weekRecap.plays ? 'Your week' : 'Recap'}</span>
             <span className="mt-0.5 block truncate text-title font-bold">{weekRecap.plays ? formatListening(weekRecap.seconds) : 'Your recap'}</span>
-            <span className="block truncate text-footnote text-fg-2">{weekRecap.plays ? `${weekRecap.plays} plays · ${weekRecap.topArtists[0]?.name ?? ''}` : 'Day, week, month and year, on this device'}</span>
+            <span className="block truncate text-footnote text-fg-2">{weekRecap.plays ? `${weekRecap.plays} play${weekRecap.plays === 1 ? '' : 's'} · ${weekRecap.topArtists[0]?.name ?? ''}` : 'Nothing this week yet. Older listening is in your recap'}</span>
           </span>
           <ChevronRight size={20} className="shrink-0 text-fg-3" />
         </Link>

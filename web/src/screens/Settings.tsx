@@ -16,6 +16,42 @@ import { AboutData } from '../components/AboutData';
 import { DisplayDiagnostics } from '../components/DisplayDiagnostics';
 import { ArtworkDiagnostics } from '../components/ArtworkDiagnostics';
 import { ScreenHeader } from './common';
+import { canSetVolume, LEVELLING_KEY, readLevelling, type Levelling } from '../lib/levelling';
+import { getPlayer } from '../lib/player';
+import { haptic, HAPTICS_KEY, hapticsOn } from '../lib/haptics';
+
+const SWITCH = 'h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-s3 transition-colors checked:bg-fg [&::before]:block [&::before]:h-5 [&::before]:w-5 [&::before]:translate-x-0.5 [&::before]:translate-y-0.5 [&::before]:rounded-full [&::before]:bg-white [&::before]:transition-transform checked:[&::before]:translate-x-[1.375rem] checked:[&::before]:bg-black';
+const LEVELS: [Levelling, string][] = [['off', 'Off'], ['track', 'Track'], ['album', 'Album']];
+
+function PlaybackGroup() {
+  const [level, setLevel] = useState<Levelling>(readLevelling);
+  const [settable] = useState(canSetVolume);
+  const pick = (v: Levelling) => {
+    setLevel(v);
+    try { localStorage.setItem(LEVELLING_KEY, JSON.stringify(v)); } catch { /* ignore */ }
+    getPlayer().setLevelling(v);
+  };
+  return (
+    <Group title="Playback" footer={settable
+      ? 'Levelling reads ReplayGain tags in your files and turns louder songs down. Album keeps the steps between songs of one album. Songs without tags play as they are. Haptics on iPhone rely on a Safari behaviour that some iOS versions may not have.'
+      : 'Levelling needs control over playback volume, which iOS keeps for the volume buttons. It works when Cadence runs in a desktop or Android browser. Haptics rely on a Safari behaviour that some iOS versions may not have.'}>
+      <div className="text-body font-medium">
+        <span>Volume levelling</span>
+        <div className="mt-2 flex rounded-full bg-s3 p-0.5" role="radiogroup" aria-label="Volume levelling">
+          {LEVELS.map(([k, label]) => (
+            <button key={k} role="radio" aria-checked={level === k} disabled={!settable && k !== 'off'} onClick={() => pick(k)}
+              className={`press h-8 min-w-0 flex-1 truncate rounded-full px-2 text-footnote font-semibold disabled:opacity-35 ${level === k ? 'bg-fg text-black' : 'text-fg-2'}`}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <label className="mt-4 flex items-center justify-between gap-4 text-body font-medium">
+        Haptics
+        <input type="checkbox" role="switch" className={SWITCH} defaultChecked={hapticsOn()} aria-label="Haptics"
+          onChange={(e) => { try { localStorage.setItem(HAPTICS_KEY, String(e.target.checked)); } catch { /* ignore */ } haptic(); }} />
+      </label>
+    </Group>
+  );
+}
 
 function Group({ title, footer, children }: { title: string; footer?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -101,6 +137,8 @@ export default function Settings() {
             onChange={(e) => { try { localStorage.setItem(ART_ACCENT_KEY, String(e.target.checked)); } catch { /* ignore */ } refreshAccent(); }} />
         </label>
       </Group>
+
+      <PlaybackGroup />
 
       <Group title="Listening recap" footer="Your day, week, month and year recaps are built from a small log kept only on this device. It is included in backups.">
         <Link to="/recap" className="press mb-4 flex items-center justify-between text-body font-medium">View recap <ChevronRight size={18} className="text-fg-3" /></Link>

@@ -1,16 +1,19 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
-import { deleteTrack, toggleFavorite } from '../lib/library';
+import { deleteTrack, groupAlbums, groupArtists, toggleFavorite } from '../lib/library';
 import { forgetArt } from '../lib/art';
 import { getPlayer } from '../lib/player';
 import { addToPlaylist, createPlaylist } from '../lib/playlists';
-import { usePlaylists } from '../lib/hooks';
+import { usePlaylists, useTracks } from '../lib/hooks';
 import { formatBytes, formatTime } from '../lib/storage';
 import { ui, useUI } from '../lib/ui';
 import { browserArtProcessor, trimTrack, useOriginal } from '../lib/artEdits';
 import { Art } from './Art';
-import { CheckIcon, HeartIcon, NoteIcon, PlayIcon, PlusIcon, QueueIcon, TrashIcon } from './Icons';
+import { AlbumIcon, ArtistIcon, CheckIcon, HeartIcon, NoteIcon, PlayIcon, PlusIcon, QueueIcon, ShuffleIcon, TrashIcon } from './Icons';
+
+const albumKey = (t: { album: string; artist: string }) => `${t.album}\u0000${t.artist}`;
 
 export function Sheet({ onClose, children, z = 'z-[60]', title, tall }: { onClose: () => void; children: ReactNode; z?: string; title?: string; tall?: boolean }) {
   useEffect(() => {
@@ -50,9 +53,11 @@ export function TrackSheet() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => setConfirmDelete(false), [sheetTrackId]);
   const artEdit = useLiveQuery(() => (sheetTrackId ? db.artEdits.get(sheetTrackId) : undefined), [sheetTrackId]);
+  const nav = useNavigate();
   if (!sheetTrackId || !track) return null;
   const p = getPlayer();
   const close = ui.closeTrackSheet;
+  const go = (to: string) => { close(); ui.closePlayer(false); nav(to); };
   return (
     <Sheet onClose={close} title={undefined}>
       <div className="mb-2 flex items-center gap-3 border-b border-line pb-3 pt-1">
@@ -66,6 +71,8 @@ export function TrackSheet() {
       <SheetItem icon={<QueueIcon size={20} />} label="Add to queue" onClick={() => { p.enqueue([track.id]); ui.toast('Added to queue'); close(); }} />
       <SheetItem icon={<HeartIcon size={20} filled={!!track.favorite} />} label={track.favorite ? 'Remove from favorites' : 'Add to favorites'} onClick={() => { void toggleFavorite(track.id); close(); }} />
       <SheetItem icon={<PlusIcon size={20} />} label="Add to playlist" onClick={() => { close(); ui.openPlaylistPicker([track.id]); }} />
+      {track.album !== 'Unknown Album' && <SheetItem icon={<AlbumIcon size={20} />} label="Go to album" onClick={() => go(`/library/albums/${encodeURIComponent(albumKey(track))}`)} />}
+      {track.artist !== 'Unknown Artist' && <SheetItem icon={<ArtistIcon size={20} />} label="Go to artist" onClick={() => go(`/library/artists/${encodeURIComponent(track.artist)}`)} />}
       {track.hasArt && browserArtProcessor && (artEdit?.blob && !artEdit.disabled ? (
         <SheetItem icon={<NoteIcon size={20} />} label="Use original artwork" onClick={async () => { await useOriginal(track.id); ui.toast('Using the original artwork'); close(); }} />
       ) : (
@@ -87,6 +94,39 @@ export function TrackSheet() {
       ) : (
         <SheetItem danger icon={<TrashIcon size={20} />} label="Delete from library" onClick={() => setConfirmDelete(true)} />
       )}
+    </Sheet>
+  );
+}
+
+/** Long-press menu for an album or artist card. */
+export function GroupSheet() {
+  const { sheetGroup } = useUI();
+  const tracks = useTracks();
+  const nav = useNavigate();
+  const group = useMemo(() => {
+    if (!sheetGroup || !tracks) return null;
+    return (sheetGroup.kind === 'albums' ? groupAlbums(tracks) : groupArtists(tracks)).find((g) => g.key === sheetGroup.key) ?? null;
+  }, [sheetGroup, tracks]);
+  if (!sheetGroup || !group) return null;
+  const p = getPlayer();
+  const close = ui.closeGroupSheet;
+  const ids = group.trackIds;
+  const album = sheetGroup.kind === 'albums';
+  return (
+    <Sheet onClose={close}>
+      <div className="mb-2 flex items-center gap-3 border-b border-line pb-3 pt-1">
+        <Art trackId={group.artTrackId} seed={group.name} className="h-14 w-14" rounded={album ? 'rounded-md' : 'rounded-full'} />
+        <div className="min-w-0">
+          <div className="truncate text-body-lg font-semibold">{group.name}</div>
+          <div className="truncate text-footnote text-fg-2">{album ? `${group.subtitle} · ${ids.length} song${ids.length === 1 ? '' : 's'}` : group.subtitle}</div>
+        </div>
+      </div>
+      <SheetItem icon={<PlayIcon size={20} />} label="Play" onClick={() => { void p.playQueue(ids, 0); close(); }} />
+      <SheetItem icon={<ShuffleIcon size={20} />} label="Shuffle" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); close(); }} />
+      <SheetItem icon={<PlayIcon size={20} />} label="Play next" onClick={() => { p.enqueueNext(ids); ui.toast('Playing next'); close(); }} />
+      <SheetItem icon={<QueueIcon size={20} />} label="Add to queue" onClick={() => { p.enqueue(ids); ui.toast(`Added ${ids.length} song${ids.length === 1 ? '' : 's'} to queue`); close(); }} />
+      <SheetItem icon={<PlusIcon size={20} />} label="Add to playlist" onClick={() => { close(); ui.openPlaylistPicker(ids); }} />
+      {album && group.subtitle !== 'Unknown Artist' && <SheetItem icon={<ArtistIcon size={20} />} label="Go to artist" onClick={() => { close(); nav(`/library/artists/${encodeURIComponent(group.subtitle)}`); }} />}
     </Sheet>
   );
 }

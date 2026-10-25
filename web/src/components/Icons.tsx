@@ -45,3 +45,8 @@ export const CadenceMark = ({ size = 24, className }: P) => (
     <g fill="currentColor">{[[3, 9], [7.5, 15], [12, 20], [16.5, 12], [21, 7]].map(([x, h], i) => <rect key={i} x={x - 1.4} y={12 - h / 2} width="2.8" height={h} rx="1.4" />)}</g>
   </svg>
 );
+export const AlbumIcon = (p: P) => stroke(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.5" /></>, p);
+export const ArtistIcon = (p: P) => stroke(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>, p);
+export const GripIcon = (p: P) => stroke(<><path d="M5 9h14" /><path d="M5 15h14" /></>, p);
+export const ShareIcon = (p: P) => stroke(<><path d="M12 3v12" /><path d="m7 8 5-5 5 5" /><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></>, p);
+export const TimingIcon = (p: P) => stroke(<><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M10 2h4" /></>, p);

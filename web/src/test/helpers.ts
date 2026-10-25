@@ -21,6 +21,7 @@ export class FakeAudio extends EventTarget {
   paused = true;
   ended = false;
   preload = '';
+  volume = 1;
   playCalls = 0;
   failPlayWith: string | null = null;
   play = async () => {

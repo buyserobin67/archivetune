@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Art } from '../components/Art';
-import { ChevronLeft, ChevronRight } from '../components/Icons';
+import { ChevronLeft, ChevronRight, ShareIcon } from '../components/Icons';
+import { renderRecapCard, shareOrSave } from '../lib/recapCard';
+import { ui } from '../lib/ui';
 import { StatsSaver } from '../components/StatsSaver';
 import { db } from '../lib/db';
 import { getPlayer } from '../lib/player';
-import { computeRecap, currentStreak, formatListening, rangeFor, type Period, type Ranked } from '../lib/stats';
+import { computeRecap, currentStreak, formatListening, rangeFor, type Period, type Ranked, type Recap as RecapData } from '../lib/stats';
 import { ScreenHeader } from './common';
 
 const PERIODS: [Period, string][] = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']];
@@ -45,6 +47,29 @@ function RankList({ title, rows, kind }: { title: string; rows: Ranked[]; kind: 
         ))}
       </ol>
     </section>
+  );
+}
+
+/**
+ * Saves or shares the recap as an image drawn on this device. The image is prepared as soon as the numbers settle,
+ * because iOS only opens the share sheet straight from a tap, not after waiting for a render.
+ */
+function ShareCard({ recap, period }: { recap: RecapData; period: Period }) {
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const sig = `${period}|${recap.range.start}|${recap.plays}|${Math.round(recap.seconds)}|${recap.topArtists[0]?.name ?? ''}`;
+  useEffect(() => {
+    let live = true;
+    setBlob(null);
+    const t = setTimeout(() => { void renderRecapCard(recap, period).then((b) => { if (live) setBlob(b); }).catch(() => {}); }, 250);
+    return () => { live = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+  const name = `cadence-${period}-${new Date(recap.range.start).toISOString().slice(0, 10)}.png`;
+  return (
+    <button className="press flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 text-footnote font-semibold disabled:opacity-40" disabled={!blob} data-testid="recap-share"
+      onClick={async () => { if (!blob) return; const r = await shareOrSave(blob, name); if (r === 'saved') ui.toast('Recap image saved'); }}>
+      <ShareIcon size={16} /> Share
+    </button>
   );
 }
 
@@ -93,7 +118,10 @@ export default function Recap() {
       ) : (
         <>
           <section className="mx-gutter mt-5 rounded-xl bg-s1 p-5" aria-label="Summary">
-            <div className="text-caption uppercase tracking-wider text-fg-3">Time listening</div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-caption uppercase tracking-wider text-fg-3">Time listening</div>
+              <ShareCard recap={recap} period={period} />
+            </div>
             <div className="mt-1 text-display font-bold tabular-nums" data-testid="recap-time">{formatListening(recap.seconds)}</div>
             <div className="mt-4 grid grid-cols-4 gap-3">
               <Stat value={recap.plays} label="plays" />

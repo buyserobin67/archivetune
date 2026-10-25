@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import type { Group } from '../lib/library';
 import type { Track } from '../lib/types';
 import { getPlayer, usePlayer } from '../lib/player';
+import { useLongPress } from '../lib/longPress';
+import { ui } from '../lib/ui';
 import { Art } from './Art';
 import { ChevronRight, PauseIcon, PlayIcon } from './Icons';
 
@@ -29,8 +31,9 @@ export function Shelf({ children }: { children: ReactNode }) {
 }
 
 export function TrackCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
+  const hold = useLongPress(() => ui.openTrackSheet(track.id));
   return (
-    <button className="press w-[9.5rem] text-left" onClick={onPlay} aria-label={`Play ${track.title}`}>
+    <button className="press hold w-[9.5rem] text-left" onClick={onPlay} aria-label={`Play ${track.title}`} {...hold}>
       <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-lg" shadow />
       <div className="mt-2 truncate text-footnote font-semibold leading-snug">{track.title}</div>
       <div className="truncate text-caption text-fg-2">{track.artist}</div>
@@ -38,9 +41,13 @@ export function TrackCard({ track, onPlay }: { track: Track; onPlay: () => void 
   );
 }
 
+/** `base` is `/library/albums` or `/library/artists`: it decides the long-press menu too. */
+const kindOf = (base: string) => (base.endsWith('artists') ? 'artists' : 'albums');
+
 export function GroupCard({ group, base, round }: { group: Group; base: string; round?: boolean }) {
+  const hold = useLongPress(() => ui.openGroupSheet(kindOf(base), group.key));
   return (
-    <Link to={`${base}/${encodeURIComponent(group.key)}`} className="press block w-[9.5rem] text-left">
+    <Link to={`${base}/${encodeURIComponent(group.key)}`} className="press hold block w-[9.5rem] text-left" {...hold}>
       <Art trackId={group.artTrackId} seed={group.name} className="w-full" rounded={round ? 'rounded-full' : 'rounded-lg'} shadow />
       <div className={`mt-2 truncate text-footnote font-semibold leading-snug ${round ? 'text-center' : ''}`}>{group.name}</div>
       <div className={`truncate text-caption text-fg-2 ${round ? 'text-center' : ''}`}>{group.subtitle}</div>
@@ -51,14 +58,19 @@ export function GroupCard({ group, base, round }: { group: Group; base: string; 
 export function GroupGrid({ groups, base, round }: { groups: Group[]; base: string; round?: boolean }) {
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-5 px-gutter pb-4">
-      {groups.map((g) => (
-        <Link key={g.key} to={`${base}/${encodeURIComponent(g.key)}`} className="press block min-w-0">
-          <Art trackId={g.artTrackId} seed={g.name} className="w-full" rounded={round ? 'rounded-full' : 'rounded-lg'} shadow />
-          <div className={`mt-2 truncate text-body font-semibold leading-snug ${round ? 'text-center' : ''}`}>{g.name}</div>
-          <div className={`truncate text-footnote text-fg-2 ${round ? 'text-center' : ''}`}>{g.subtitle}</div>
-        </Link>
-      ))}
+      {groups.map((g) => <GridItem key={g.key} group={g} base={base} round={round} />)}
     </div>
+  );
+}
+
+function GridItem({ group: g, base, round }: { group: Group; base: string; round?: boolean }) {
+  const hold = useLongPress(() => ui.openGroupSheet(kindOf(base), g.key));
+  return (
+    <Link to={`${base}/${encodeURIComponent(g.key)}`} className="press hold block min-w-0" {...hold}>
+      <Art trackId={g.artTrackId} seed={g.name} className="w-full" rounded={round ? 'rounded-full' : 'rounded-lg'} shadow />
+      <div className={`mt-2 truncate text-body font-semibold leading-snug ${round ? 'text-center' : ''}`}>{g.name}</div>
+      <div className={`truncate text-footnote text-fg-2 ${round ? 'text-center' : ''}`}>{g.subtitle}</div>
+    </Link>
   );
 }
 
@@ -66,8 +78,9 @@ export function GroupGrid({ groups, base, round }: { groups: Group[]; base: stri
 export function QuickPickCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
   const { track: cur, isPlaying } = usePlayer();
   const active = cur?.id === track.id;
+  const hold = useLongPress(() => ui.openTrackSheet(track.id));
   return (
-    <div className="relative w-[11.5rem]">
+    <div className="hold relative w-[11.5rem]" {...hold}>
       <button className="press block w-full text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
         <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-xl" shadow />
         <div className="pointer-events-none absolute inset-0 rounded-xl" style={{ background: 'linear-gradient(to top, rgb(0 0 0 / .82) 0%, rgb(0 0 0 / .25) 42%, transparent 62%)' }} />
@@ -91,8 +104,9 @@ export function QuickPickCard({ track, onPlay }: { track: Track; onPlay: () => v
 export function ListenRow({ track, onPlay }: { track: Track; onPlay: () => void }) {
   const { track: cur, isPlaying } = usePlayer();
   const active = cur?.id === track.id;
+  const hold = useLongPress(() => ui.openTrackSheet(track.id));
   return (
-    <div className="cv-row flex items-center gap-3 px-gutter py-1.5">
+    <div className="cv-row hold flex items-center gap-3 px-gutter py-1.5" {...hold}>
       <button className="press flex min-w-0 flex-1 items-center gap-3 text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
         <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="h-12 w-12" rounded="rounded-lg" />
         <div className="min-w-0 flex-1">

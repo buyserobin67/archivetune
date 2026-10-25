@@ -70,13 +70,23 @@ export function GroupDetail({ kind }: { kind: 'albums' | 'artists' }) {
   const total = list.reduce((n, t) => n + t.duration, 0);
   const p = getPlayer();
   const ids = list.map((t) => t.id);
+  const multiDisc = kind === 'albums' && new Set(list.map((t) => t.discNo ?? 1)).size > 1;
   return (
     <div className="page-enter">
       <Hero back={`/library/${kind}`} trackId={g.artTrackId} seed={g.name} title={g.name} round={kind === 'artists'}
         meta={`${kind === 'albums' ? g.subtitle + ' · ' : ''}${list.length} song${list.length === 1 ? '' : 's'} · ${formatTime(total)}`}>
         <Actions ids={ids} />
       </Hero>
-      {list.map((t, i) => <TrackRow key={t.id} track={t} index={kind === 'albums' ? i : undefined} onPlay={() => void p.playQueue(ids, i)} />)}
+      {list.map((t, i) => {
+        const disc = t.discNo ?? 1;
+        const divider = multiDisc && (i === 0 || (list[i - 1].discNo ?? 1) !== disc);
+        return (
+          <div key={t.id}>
+            {divider && <h2 className="eyebrow px-gutter pb-1 pt-3" data-disc={disc}>Disc {disc}</h2>}
+            <TrackRow track={t} index={kind === 'albums' ? (t.trackNo ? t.trackNo - 1 : i) : undefined} onPlay={() => void p.playQueue(ids, i)} />
+          </div>
+        );
+      })}
     </div>
   );
 }

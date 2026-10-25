@@ -3,7 +3,7 @@ import { Route, Routes, useLocation } from 'react-router-dom';
 import { Dock } from './components/Dock';
 import { UpdateBanner } from './components/UpdateBanner';
 import { NowPlaying } from './components/NowPlaying';
-import { PlaylistPicker, TrackSheet } from './components/Sheets';
+import { GroupSheet, PlaylistPicker, TrackSheet } from './components/Sheets';
 import Home from './screens/Home';
 import Library from './screens/Library';
 import { GroupDetail, PlaylistDetail } from './screens/Detail';
@@ -36,6 +36,7 @@ export default function App() {
       <Dock />
       <NowPlaying />
       <TrackSheet />
+      <GroupSheet />
       <PlaylistPicker />
     </div>
   );

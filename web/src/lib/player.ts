@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { getArtUrl } from './art';
 import { db as defaultDb, getSetting, setSetting, type CadenceDB } from './db';
 import { markPlayed } from './library';
+import { gainToVolume, readLevelling, type Levelling } from './levelling';
 import { dbListenWriters, ListenTracker } from './stats';
 import * as Q from './queue';
 import type { RepeatMode, Track } from './types';
@@ -26,7 +27,10 @@ export interface TimeState { currentTime: number; duration: number }
 export type AudioLike = Pick<
   HTMLAudioElement,
   'src' | 'currentTime' | 'duration' | 'paused' | 'play' | 'pause' | 'load' | 'addEventListener' | 'removeAttribute'
-> & { preload: string };
+> & { preload: string; volume: number };
+
+/** Whether the page is in the background. Injected in tests. */
+export interface VisibilityLike { hidden(): boolean; onChange(fn: () => void): void }
 
 interface MediaSessionLike {
   metadata: unknown;
@@ -41,9 +45,19 @@ export interface PlayerDeps {
   mediaSession?: MediaSessionLike | null;
   makeMetadata?: (init: { title: string; artist: string; album: string; artwork: { src: string; sizes: string; type?: string }[] }) => unknown;
   fallbackArt?: string;
+  visibility?: VisibilityLike | null;
+  levelling?: Levelling;
+  now?: () => number;
 }
 
 const RESTART_THRESHOLD = 3;
+/** Seconds before the end at which the next song's row and audio are read from the database. */
+export const PREFETCH_LEAD = 10;
+/**
+ * iOS can drop a home-screen app's audio session while it sits paused in the background. After a pause this long that
+ * spanned a trip to the background, the first play reloads the song at the same position instead of trusting the old one.
+ */
+export const STALE_PAUSE_MS = 30_000;
 
 export class Player {
   readonly audio: AudioLike;
@@ -67,6 +81,13 @@ export class Player {
   private lastPosSave = 0;
   private lastPosState = 0;
   private sleepTimer: ReturnType<typeof setTimeout> | null = null;
+  private prepared: { id: string; track: Track; blob: Blob } | null = null;
+  private preparing: string | null = null;
+  private levelling: Levelling;
+  private visibility: VisibilityLike | null;
+  private now: () => number;
+  private pausedAt = 0;
+  private backgroundedWhilePaused = false;
 
   constructor(deps: PlayerDeps) {
     this.audio = deps.audio;
@@ -74,6 +95,10 @@ export class Player {
     this.ms = deps.mediaSession ?? null;
     this.makeMetadata = deps.makeMetadata ?? ((i) => (typeof MediaMetadata !== 'undefined' ? new MediaMetadata(i) : i));
     this.fallbackArt = deps.fallbackArt ?? '';
+    this.levelling = deps.levelling ?? 'off';
+    this.visibility = deps.visibility ?? null;
+    this.now = deps.now ?? Date.now;
+    this.visibility?.onChange(() => { if (this.visibility!.hidden() && this.pausedAt) this.backgroundedWhilePaused = true; });
     this.audio.preload = 'auto';
     const w = dbListenWriters(this.db);
     this.tracker = new ListenTracker(w.write, w.update);
@@ -101,7 +126,12 @@ export class Player {
   // ---- audio events ----
   private bindAudio() {
     const a = this.audio;
-    a.addEventListener('play', () => { this.set({ isPlaying: true, interrupted: false, error: null }); this.syncSession(); });
+    a.addEventListener('play', () => {
+      this.pausedAt = 0;
+      this.backgroundedWhilePaused = false;
+      this.set({ isPlaying: true, interrupted: false, error: null });
+      this.syncSession();
+    });
     a.addEventListener('playing', () => {
       this.consecutiveFailures = 0;
       this.set({ loading: false, isPlaying: true });
@@ -116,6 +146,8 @@ export class Player {
       // A pause we did not ask for (phone call, Siri, another app grabbing audio) is an interruption.
       void this.tracker.flush();
       const interrupted = !this.userPaused && this.state.track !== null && this.loadToken > 0 && !this.state.loading;
+      this.pausedAt = this.now();
+      this.backgroundedWhilePaused = !!this.visibility?.hidden();
       this.set({ isPlaying: false, interrupted });
       this.syncSession();
       void this.savePosition(true);
@@ -136,6 +168,7 @@ export class Player {
       this.setTime({ currentTime: a.currentTime });
       this.updatePositionState(false);
       void this.savePosition(false);
+      if (Number.isFinite(a.duration) && a.duration - a.currentTime < PREFETCH_LEAD) void this.prepareNext();
     });
     a.addEventListener('ended', () => void this.onEnded());
     a.addEventListener('error', () => void this.onError());
@@ -185,7 +218,12 @@ export class Player {
     const id = Q.currentId(this.state.queue);
     if (!id) return this.unload();
     this.set({ loading: true, error: null, interrupted: false });
-    const [track, blobRow] = await Promise.all([this.db.tracks.get(id), this.db.blobs.get(id)]);
+    this.pausedAt = 0;
+    const ready = this.prepared?.id === id ? this.prepared : null;
+    this.prepared = null;
+    this.preparing = null;
+    // A prefetched next song skips the database read, which is most of the gap between songs on a phone.
+    const [track, blobRow] = ready ? [ready.track, { trackId: id, blob: ready.blob }] : await Promise.all([this.db.tracks.get(id), this.db.blobs.get(id)]);
     if (token !== this.loadToken) return; // superseded by a newer request
     if (!track) {
       this.set({ queue: Q.removeAt(this.state.queue, this.state.queue.index), loading: false });
@@ -205,6 +243,7 @@ export class Player {
     this.countedPlay = false;
     this.pendingSeek = resumeAt;
     this.audio.src = this.objectUrl; // same element every time: iOS keeps the audio session alive across tracks
+    this.applyVolume(track);
     if (prev) URL.revokeObjectURL(prev);
     this.set({ track });
     this.tracker.start({ id: track.id, title: track.title, artist: track.artist, album: track.album, duration: track.duration }, resumeAt);
@@ -218,6 +257,28 @@ export class Player {
       this.userPaused = true;
       this.set({ loading: false, isPlaying: false });
     }
+  }
+
+  /** Reads the song that will play next into memory shortly before this one ends. */
+  private async prepareNext() {
+    const after = Q.afterCurrent(this.state.queue);
+    const id = after.kind === 'next' || (after.kind === 'wrap' && !after.same) ? after.id : null;
+    if (!id || this.preparing === id || this.prepared?.id === id) return;
+    this.preparing = id;
+    try {
+      const [track, row] = await Promise.all([this.db.tracks.get(id), this.db.blobs.get(id)]);
+      if (this.preparing !== id || !track || !row) return;
+      this.prepared = { id, track, blob: row.blob };
+    } catch { /* the normal load path will report it */ }
+  }
+
+  private applyVolume(track: Track) {
+    try { this.audio.volume = gainToVolume(track.gain, this.levelling); } catch { /* read-only on iOS */ }
+  }
+
+  setLevelling(mode: Levelling) {
+    this.levelling = mode;
+    if (this.state.track) this.applyVolume(this.state.track);
   }
 
   private restartTracker() {
@@ -265,6 +326,10 @@ export class Player {
   async play() {
     if (!this.state.track) {
       if (this.state.queue.index >= 0) await this.loadCurrent(true);
+      return;
+    }
+    if (this.pausedAt && this.backgroundedWhilePaused && this.now() - this.pausedAt > STALE_PAUSE_MS && !this.visibility?.hidden()) {
+      await this.loadCurrent(true, this.audio.currentTime);
       return;
     }
     this.userPaused = false;
@@ -336,6 +401,11 @@ export class Player {
     this.persistQueue();
     if (wasCurrent) await this.loadCurrent(this.state.isPlaying);
   }
+  /** Undo for removeFromQueue on an entry that was not playing. */
+  insertInQueue(index: number, id: string, originalAt?: number) {
+    this.set({ queue: Q.insertAt(this.state.queue, index, id, originalAt) });
+    this.persistQueue();
+  }
   moveInQueue(from: number, to: number) { this.set({ queue: Q.move(this.state.queue, from, to) }); this.persistQueue(); }
   clearUpcoming() { this.set({ queue: Q.clearUpcoming(this.state.queue) }); this.persistQueue(); }
 
@@ -343,6 +413,8 @@ export class Player {
   async onLibraryChanged() {
     const ids = new Set((await this.db.tracks.toCollection().primaryKeys()) as string[]);
     const cur = Q.currentId(this.state.queue);
+    this.prepared = null;
+    this.preparing = null;
     this.set({ queue: Q.prune(this.state.queue, (id) => ids.has(id)) });
     if (cur && !ids.has(cur)) await this.loadCurrent(false);
     this.persistQueue();
@@ -447,6 +519,8 @@ export function getPlayer(): Player {
       audio,
       mediaSession: 'mediaSession' in navigator ? (navigator.mediaSession as unknown as MediaSessionLike) : null,
       fallbackArt: new URL(`${base}icons/icon-512.png`, location.href).href,
+      levelling: readLevelling(),
+      visibility: { hidden: () => document.visibilityState === 'hidden', onChange: (fn) => document.addEventListener('visibilitychange', fn) },
     });
   }
   return instance;

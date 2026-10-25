@@ -189,3 +189,21 @@ describe('queue screen selectors', () => {
   });
 });
 
+
+describe('insertAt (undo remove)', () => {
+  it('puts a removed upcoming entry back in both orders', () => {
+    const q = Q.setQueue(Q.emptyQueue(), seq(5), 1);
+    const removed = Q.removeAt(q, 3);
+    const back = Q.insertAt(removed, 3, 'd', q.original.indexOf('d'));
+    expect(back.items).toEqual(q.items);
+    expect(back.original).toEqual(q.original);
+    expect(back.index).toBe(1);
+  });
+
+  it('keeps the current entry current when inserting before it', () => {
+    const q = Q.setQueue(Q.emptyQueue(), seq(3), 2);
+    const r = Q.insertAt(q, 0, 'z');
+    expect(Q.currentId(r)).toBe('c');
+    expect(r.original).toEqual(['a', 'b', 'c', 'z']);
+  });
+});

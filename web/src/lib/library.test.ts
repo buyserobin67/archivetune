@@ -124,3 +124,13 @@ describe('library queries', () => {
     expect((await db.playlists.get('p'))!.trackIds).toEqual([]);
   });
 });
+
+describe('album order', () => {
+  it('sorts by disc, then track number', async () => {
+    const db = makeDb();
+    const tags: Record<string, { discNo?: number; trackNo?: number }> = { 'a.mp3': { discNo: 2, trackNo: 1 }, 'b.mp3': { discNo: 1, trackNo: 2 }, 'c.mp3': { discNo: 1, trackNo: 1 }, 'd.mp3': { trackNo: 3 } };
+    const { added } = await importFiles(Object.keys(tags).map((n) => audioFile(n, n)), { db, parse: async (_f, n) => ({ title: n, album: 'Double', artist: 'X', ...tags[n] }) });
+    const [g] = groupAlbums(added);
+    expect(g.trackIds.map((id) => added.find((t) => t.id === id)!.title)).toEqual(['c.mp3', 'b.mp3', 'd.mp3', 'a.mp3']);
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseName, currentLineIndex, isLyricFile, parseLrc, toLyrics } from './lrc';
+import { baseName, currentLineIndex, isLyricFile, parseLrc, toLyrics, wordTimings, wordProgress, clampOffset } from './lrc';
 
 describe('LRC parsing', () => {
   it('parses synced lines and ignores metadata tags', () => {
@@ -49,5 +49,59 @@ describe('LRC parsing', () => {
     expect(isLyricFile('Song.LRC')).toBe(true);
     expect(isLyricFile('song.mp3')).toBe(false);
     expect(baseName('01  My  Song.MP3')).toBe('01 my song');
+  });
+});
+
+describe('word-timed (enhanced) LRC', () => {
+  it('keeps when each word starts', () => {
+    const l = parseLrc('[00:01.00]<00:01.00>Hello <00:01.40>  world <00:02.00>').lines![0];
+    expect(l.text).toBe('Hello world');
+    expect(l.words).toEqual([{ t: 1, text: 'Hello ' }, { t: 1.4, text: 'world' }]);
+  });
+
+  it('starts untimed leading text with the line and shifts repeated lines', () => {
+    const lines = parseLrc('[00:10.00][01:10.00]Oh <00:10.50>yeah').lines!;
+    expect(lines.map((l) => l.words)).toEqual([
+      [{ t: 10, text: 'Oh ' }, { t: 10.5, text: 'yeah' }],
+      [{ t: 70, text: 'Oh ' }, { t: 70.5, text: 'yeah' }],
+    ]);
+  });
+
+  it('leaves plain synced lines without words', () => {
+    expect(parseLrc('[00:01.00]Just a line').lines![0].words).toBeUndefined();
+  });
+});
+
+describe('karaoke timing', () => {
+  it('ends each stamped word where the next begins', () => {
+    const w = wordTimings({ t: 1, text: 'Hello world', words: [{ t: 1, text: 'Hello ' }, { t: 1.4, text: 'world' }] }, 5);
+    expect(w[0]).toEqual({ text: 'Hello ', t: 1, end: 1.4 });
+    expect(w[1].t).toBe(1.4);
+    expect(w[1].end).toBeGreaterThan(1.4);
+    expect(w[1].end).toBeLessThanOrEqual(5);
+  });
+
+  it('spreads a line-timed line by letters, inside the gap to the next line', () => {
+    const w = wordTimings({ t: 10, text: 'one two three' }, 11);
+    expect(w.map((x) => x.text).join('')).toBe('one two three');
+    expect(w[0].t).toBe(10);
+    expect(w[w.length - 1].end).toBeLessThanOrEqual(10.9 + 1e-9);
+    expect(wordProgress(w[0], 9)).toBe(0);
+    expect(wordProgress(w[0], 20)).toBe(1);
+    expect(wordProgress(w[0], (w[0].t + w[0].end) / 2)).toBeCloseTo(0.5);
+  });
+
+  it('keeps the timing nudge in 0.1 s steps and a sane range', () => {
+    expect(clampOffset(0.5 + 0.5 + 0.1)).toBe(1.1);
+    expect(clampOffset(-25)).toBe(-10);
+  });
+});
+
+describe('syllable stamps', () => {
+  it('keeps a word split by a stamp as one word', () => {
+    const l = parseLrc('[00:01.00]Hel<00:01.20>lo <00:01.50>there').lines![0];
+    expect(l.text).toBe('Hello there');
+    expect(l.words!.map((w) => w.text).join('')).toBe('Hello there');
+    expect(l.words).toEqual([{ t: 1, text: 'Hel' }, { t: 1.2, text: 'lo ' }, { t: 1.5, text: 'there' }]);
   });
 });

@@ -57,6 +57,11 @@ export function formatBytes(n: number): string {
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${u[i]}`;
 }
 
+/** Time left, rounded up so it only reads 0:00 at the very end and elapsed + remaining always adds up to the length. */
+export function formatRemaining(duration: number, elapsed: number): string {
+  return `-${formatTime(Math.ceil(Math.max(duration - elapsed, 0) - 1e-6))}`;
+}
+
 export function formatTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '0:00';
   const s = Math.floor(sec);

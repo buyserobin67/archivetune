@@ -1,7 +1,40 @@
-import type { LyricLine, Lyrics } from './types';
+import type { LyricLine, LyricWord, Lyrics } from './types';
 
 const TS = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
 const WORD_TS = /<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g;
+const WORD_TS_PARTS = /<(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?>/g;
+
+const stampSeconds = (min: string, sec: string, frac?: string) => Number(min) * 60 + Number(sec) + (frac ? Number(frac) / 10 ** frac.length : 0);
+
+/**
+ * Enhanced LRC word timing: `<mm:ss.xx>` before a word says when it starts. Text before the first word stamp starts
+ * with the line. Returns undefined when the line has no word stamps.
+ */
+export function parseWords(body: string, lineT: number): LyricWord[] | undefined {
+  if (!body.match(WORD_TS)) return undefined;
+  const words: LyricWord[] = [];
+  let at = lineT, pos = 0;
+  // Spacing is kept as written, so syllable stamps (`Hel<00:01.20>lo`) stay one word. A leading space moves to the end
+  // of the previous token, so every token ends with its own space and joining them gives the line back.
+  const push = (seg: string) => {
+    let text = seg.replace(/\s+/g, ' ');
+    if (!text.trim()) { if (text && words.length && !words[words.length - 1].text.endsWith(' ')) words[words.length - 1].text += ' '; return; }
+    if (text.startsWith(' ')) {
+      if (words.length && !words[words.length - 1].text.endsWith(' ')) words[words.length - 1].text += ' ';
+      text = text.trimStart();
+    }
+    words.push({ t: at, text });
+  };
+  for (const m of body.matchAll(WORD_TS_PARTS)) {
+    push(body.slice(pos, m.index));
+    at = stampSeconds(m[1], m[2], m[3]);
+    pos = (m.index ?? 0) + m[0].length;
+  }
+  push(body.slice(pos));
+  if (!words.length) return undefined;
+  words[words.length - 1] = { ...words[words.length - 1], text: words[words.length - 1].text.trimEnd() };
+  return words;
+}
 const META = /^\[(ti|ar|al|au|by|re|ve|length|offset|la|id):.*\]$/i;
 
 // ---- cleaning: text metadata headers and decorative separators are not lyrics ----
@@ -90,12 +123,16 @@ export function parseLrc(raw: string): ParsedLyrics {
     if (off) { offset = Number(off[1]) / 1000; continue; }
     if (META.test(line)) continue;
     const stamps = [...line.matchAll(TS)];
-    const text = line.replace(TS, '').replace(WORD_TS, '').replace(/\s+/g, ' ').trim();
+    const body = line.replace(TS, '');
+    const text = body.replace(WORD_TS, '').replace(/\s+/g, ' ').trim();
     if (!stamps.length) { plain.push(row.trim()); continue; }
+    const t0 = stampSeconds(stamps[0][1], stamps[0][2], stamps[0][3]);
+    const words = parseWords(body, t0);
     for (const m of stamps) {
-      const frac = m[3] ? Number(m[3]) / 10 ** m[3].length : 0;
-      const t = Number(m[1]) * 60 + Number(m[2]) + frac;
-      lines.push({ t: Math.max(0, t + offset), text });
+      const t = stampSeconds(m[1], m[2], m[3]);
+      // A line sung several times ([00:10][01:20]) reuses its word timing, shifted to each start.
+      const shifted = words?.map((w) => ({ t: Math.max(0, w.t + (t - t0) + offset), text: w.text }));
+      lines.push(shifted ? { t: Math.max(0, t + offset), text, words: shifted } : { t: Math.max(0, t + offset), text });
     }
   }
   if (!lines.length) return { kind: 'plain', text: cleanLyricText(plain.join('\n')) };
@@ -136,3 +173,37 @@ export const INTERLUDE_MIN = 5;
 export function lineSpan(lines: LyricLine[], i: number, fallback = 6): number {
   return i + 1 < lines.length ? lines[i + 1].t - lines[i].t : fallback;
 }
+
+// ---- karaoke timing ----
+
+export interface TimedWord { text: string; t: number; end: number }
+
+/**
+ * When each word of a line is sung. Word-timed lines use their stamps. Line-timed ones spread the line over a
+ * plausible singing time (by letter count, never longer than the gap to the next line) so the sweep still reads
+ * naturally.
+ */
+export function wordTimings(line: LyricLine, nextT: number | undefined): TimedWord[] {
+  const span = Math.max(0.2, (nextT ?? line.t + 6) - line.t);
+  if (line.words?.length) {
+    const w = line.words;
+    const avg = w.length > 1 ? (w[w.length - 1].t - w[0].t) / (w.length - 1) : 0.6;
+    return w.map((x, i) => ({ text: x.text, t: x.t, end: i + 1 < w.length ? w[i + 1].t : Math.min(line.t + span, x.t + Math.max(0.35, avg)) }));
+  }
+  const parts = line.text.split(/(?<=\s)/).filter(Boolean);
+  const letters = parts.reduce((n, p) => n + p.trim().length, 0) || 1;
+  const sweep = Math.min(span * 0.9, Math.max(1, letters * 0.07));
+  let at = line.t;
+  return parts.map((p) => {
+    const d = (sweep * p.trim().length) / letters;
+    const out = { text: p, t: at, end: at + d };
+    at += d;
+    return out;
+  });
+}
+
+/** 0..1 for how much of a word has been sung at `time`. */
+export const wordProgress = (w: TimedWord, time: number) => (time <= w.t ? 0 : time >= w.end ? 1 : (time - w.t) / Math.max(w.end - w.t, 0.01));
+
+/** Lyrics timing nudge, in seconds, kept to 0.1 s steps and within ±10 s. */
+export const clampOffset = (s: number) => Math.max(-10, Math.min(10, Math.round(s * 10) / 10));
