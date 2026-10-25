@@ -264,8 +264,12 @@ async function run() {
       const box = await rect(page, `${P} [aria-label="Lyrics"]`);
       check(await page.locator(`${P} [data-line]`).count() === 5, 'synced lyrics from the imported .lrc file are shown');
       check(cur && box && Math.abs((cur.y + cur.h / 2) - (box.y + box.h / 2)) < box.h * 0.22, 'current lyric line is centred in the lyrics view', JSON.stringify({ cur, box }));
-      const ops = await page.evaluate((s) => [...document.querySelectorAll(`${s} [data-line] button`)].map((b) => Number(getComputedStyle(b).opacity)), P);
-      check(ops.some((o) => o > 0.9) && ops.filter((o) => o < 0.6).length >= 2, 'current line is prominent, others are dimmed', JSON.stringify(ops));
+      // Line opacity animates (420ms) and the clip loops, so poll until a settled state appears instead of sampling once.
+      const settled = await page.waitForFunction((sel) => {
+        const ops = [...document.querySelectorAll(`${sel} [data-line] button`)].map((b) => Number(getComputedStyle(b).opacity));
+        return ops.some((o) => o > 0.97) && ops.filter((o) => o < 0.6).length >= 2;
+      }, P, { timeout: 4000, polling: 50 }).then(() => true, () => false);
+      check(settled, 'current line is prominent, others are dimmed');
       await noOverflow(page, P, 'lyrics');
       const lp = await rect(page, `${P} [aria-label="Pause"]`);
       check(lp && lp.b <= vp.height - vp.safe.bottom, 'lyrics: playback controls at the bottom clear the home indicator');
