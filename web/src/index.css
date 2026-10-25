@@ -1,45 +1,77 @@
+@import './design/tokens.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: env(safe-area-inset-right, 0px);
+/* Base font size follows iOS Dynamic Type in the Home Screen app; 16px elsewhere. */
+html {
+  font-size: 16px;
+  font: -apple-system-body;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
-
 html, body, #root { height: 100%; }
+html, body { overflow-x: hidden; max-width: 100%; }
 body {
   margin: 0;
-  background: #000;
-  color: #f5f3ff;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   overscroll-behavior: none;
 }
-button, input { font: inherit; color: inherit; }
-button { cursor: pointer; background: none; border: 0; padding: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; touch-action: manipulation; }
+* { -webkit-user-select: none; user-select: none; box-sizing: border-box; }
 input, textarea { -webkit-user-select: text; user-select: text; }
-* { -webkit-user-select: none; user-select: none; }
+/* 16px minimum stops iOS Safari zooming into focused inputs */
+input, textarea, select { font-size: max(1rem, 16px); }
 
-.pt-safe { padding-top: calc(var(--sat) + 0.75rem); }
-.pb-safe { padding-bottom: var(--sab); }
-.px-safe { padding-left: max(var(--sal), 1rem); padding-right: max(var(--sar), 1rem); }
+:focus-visible { outline: 2px solid rgb(var(--accent-text-rgb)); outline-offset: 2px; border-radius: 6px; }
 
-.scroll-y { overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.hide-scroll::-webkit-scrollbar { display: none; }
+@layer components {
+  .scroll-y { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+  .hide-scroll { scrollbar-width: none; }
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .row-scroll { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scroll-padding-inline: var(--gutter); overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .row-scroll > * { scroll-snap-align: start; flex: none; }
+  /* press feedback: transform+opacity only, cheap on iPhone */
+  .press { transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) linear; will-change: transform; }
+  .press:active { transform: scale(0.97); opacity: 0.8; }
+  /* long lists skip layout/paint for off-screen rows */
+  .cv-row { content-visibility: auto; contain-intrinsic-size: auto 3.75rem; }
+  .eyebrow { font-size: var(--fs-caption); line-height: var(--lh-caption); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); font-weight: 600; }
+  .tap { min-width: 2.75rem; min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; }
+}
 
-.glass { background: rgba(15, 11, 24, 0.72); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4); }
-.violet-glow { background: radial-gradient(120% 80% at 50% 0%, rgba(124, 58, 237, 0.28), rgba(0,0,0,0) 60%); }
-.press { transition: transform .12s ease, opacity .12s ease; }
-.press:active { transform: scale(.96); opacity: .85; }
-
-input[type='range'].seek { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; width: 100%; }
-input[type='range'].seek::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, #a78bfa var(--p, 0%), rgba(255,255,255,.18) var(--p, 0%)); }
-input[type='range'].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.5); }
-input[type='range'].seek::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255,255,255,.18); }
-input[type='range'].seek::-moz-range-progress { height: 4px; border-radius: 4px; background: #a78bfa; }
+/* seek bar */
+input[type='range'].seek { -webkit-appearance: none; appearance: none; height: 2.25rem; background: transparent; width: 100%; margin: 0; touch-action: none; }
+input[type='range'].seek::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: linear-gradient(to right, rgb(255 255 255 / 0.92) var(--p, 0%), rgb(255 255 255 / 0.2) var(--p, 0%)); }
+input[type='range'].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.5); transition: transform var(--dur-fast) var(--ease-out); }
+input[type='range'].seek:active::-webkit-slider-thumb { transform: scale(1.35); }
+input[type='range'].seek::-moz-range-track { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.2); }
+input[type='range'].seek::-moz-range-progress { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.92); }
 input[type='range'].seek::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
+
+/* page enter + view transitions (player morph) */
+.page-enter { animation: enter var(--dur) var(--ease-out); }
+@keyframes eq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+@keyframes sheet-in { from { transform: translateY(14%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sheet-out { from { transform: none; opacity: 1; } to { transform: translateY(14%); opacity: 0; } }
+
+::view-transition-group(cadence-art) { animation-duration: 420ms; animation-timing-function: var(--ease-out); }
+::view-transition-old(cadence-art), ::view-transition-new(cadence-art) { height: 100%; object-fit: cover; animation: none; mix-blend-mode: normal; }
+::view-transition-old(cadence-sheet) { animation: sheet-out 300ms var(--ease-out) both; }
+::view-transition-new(cadence-sheet) { animation: sheet-in 380ms var(--ease-out) both; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

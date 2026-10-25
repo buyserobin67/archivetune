@@ -32,3 +32,9 @@ export const NoteIcon = (p: P) => base(<path d="M9 3v11.3A3.5 3.5 0 1 0 11 17.5V
 export const CloseIcon = (p: P) => stroke(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, p);
 export const UpIcon = (p: P) => stroke(<path d="m6 15 6-6 6 6" />, p);
 export const DownIcon = (p: P) => stroke(<path d="m6 9 6 6 6-6" />, p);
+export const DownloadIcon = (p: P) => stroke(<><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M5 20h14" /></>, p);
+export const SortIcon = (p: P) => stroke(<><path d="M7 4v16" /><path d="m3 16 4 4 4-4" /><path d="M17 20V4" /><path d="m13 8 4-4 4 4" /></>, p);
+export const CheckIcon = (p: P) => stroke(<path d="m5 12 5 5 9-10" />, p);
+export const FilterIcon = (p: P) => stroke(<path d="M3 5h18l-7 8v6l-4 2v-8z" />, p);
+export const ListIcon = (p: P) => stroke(<><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3.5 6h.01" /><path d="M3.5 12h.01" /><path d="M3.5 18h.01" /></>, p);
+export const MicIcon = (p: P) => stroke(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></>, p);

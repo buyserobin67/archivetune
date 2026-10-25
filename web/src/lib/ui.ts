@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 
 interface UIState {
   playerOpen: boolean;
@@ -18,9 +19,24 @@ function set(p: Partial<UIState>) {
   listeners.forEach((l) => l());
 }
 
+type VTDoc = Document & { startViewTransition?: (cb: () => void) => unknown };
+
+export const prefersReducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const supportsViewTransitions = () => typeof document !== 'undefined' && typeof (document as VTDoc).startViewTransition === 'function' && !prefersReducedMotion();
+
+/** Runs a state change inside a View Transition (cover morph + sheet slide) when the browser has them. */
+function transition(update: () => void, animated = true) {
+  if (animated && supportsViewTransitions()) {
+    (document as VTDoc).startViewTransition!(() => flushSync(update));
+  } else {
+    update();
+  }
+}
+
 export const ui = {
-  openPlayer: (tab: UIState['playerTab'] = 'now') => set({ playerOpen: true, playerTab: tab }),
-  closePlayer: () => set({ playerOpen: false }),
+  openPlayer: (tab: UIState['playerTab'] = 'now') => transition(() => set({ playerOpen: true, playerTab: tab })),
+  /** `animated: false` is for swipe-dismiss, where the sheet has already animated away. */
+  closePlayer: (animated = true) => transition(() => set({ playerOpen: false }), animated),
   setPlayerTab: (tab: UIState['playerTab']) => set({ playerTab: tab }),
   openTrackSheet: (id: string) => set({ sheetTrackId: id }),
   closeTrackSheet: () => set({ sheetTrackId: null }),

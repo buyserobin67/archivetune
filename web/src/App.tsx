@@ -1,24 +1,22 @@
-import { NavLink, Route, Routes } from 'react-router-dom';
-import { HomeIcon, LibraryIcon, SearchIcon, SettingsIcon } from './components/Icons';
-import { MiniPlayer } from './components/MiniPlayer';
+import { useEffect, useRef } from 'react';
+import { Route, Routes, useLocation } from 'react-router-dom';
+import { Dock } from './components/Dock';
 import { NowPlaying } from './components/NowPlaying';
-import { PlaylistPicker, Toast, TrackSheet } from './components/Sheets';
+import { PlaylistPicker, TrackSheet } from './components/Sheets';
 import Home from './screens/Home';
-import Library, { GroupDetail, PlaylistDetail } from './screens/Library';
+import Library from './screens/Library';
+import { GroupDetail, PlaylistDetail } from './screens/Detail';
 import Search from './screens/Search';
 import Settings from './screens/Settings';
 
-const TABS = [
-  { to: '/', label: 'Home', Icon: HomeIcon, end: true },
-  { to: '/search', label: 'Search', Icon: SearchIcon },
-  { to: '/library/songs', label: 'Library', Icon: LibraryIcon, match: '/library' },
-  { to: '/settings', label: 'Settings', Icon: SettingsIcon },
-];
-
 export default function App() {
+  const main = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => { main.current?.scrollTo({ top: 0 }); }, [pathname.split('/').slice(0, 3).join('/')]);
+
   return (
-    <div className="fixed inset-0 flex flex-col bg-black">
-      <main className="scroll-y hide-scroll relative flex-1">
+    <div className="fixed inset-0 overflow-hidden bg-bg">
+      <main ref={main} id="main" className="scroll-y hide-scroll absolute inset-0" style={{ paddingBottom: 'calc(var(--dock-h) + 1.5rem)' }}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
@@ -30,27 +28,11 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Home />} />
         </Routes>
-        <div className="h-6" />
       </main>
-      <div className="z-30">
-        <MiniPlayer />
-        <nav className="glass border-t border-white/10 pb-safe">
-          <ul className="flex">
-            {TABS.map(({ to, label, Icon, end, match }) => (
-              <li key={to} className="flex-1">
-                <NavLink to={to} end={end} className={({ isActive }) => `press flex flex-col items-center gap-0.5 py-2 text-[11px] ${isActive || (match && location.hash.startsWith('#' + match)) ? 'text-violet-300' : 'text-white/45'}`}>
-                  <Icon size={24} />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </div>
+      <Dock />
       <NowPlaying />
       <TrackSheet />
       <PlaylistPicker />
-      <Toast />
     </div>
   );
 }

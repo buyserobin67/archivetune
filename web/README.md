@@ -7,6 +7,7 @@ npm ci
 npm run dev        # http://localhost:5173
 npm test           # vitest (fake-indexeddb)
 npm run build      # typecheck + production build into dist/
+npm run e2e        # browser E2E at iPhone viewports (needs a build with VITE_BASE=/archivetune/; see docs/WEB_DESIGN.md)
 ```
 
 Production builds for GitHub Pages need the repo subpath: `VITE_BASE=/<repo>/ npm run build && node scripts/verify-dist.mjs /<repo>/`.

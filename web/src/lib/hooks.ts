@@ -33,3 +33,18 @@ export function useStorageStatus(refreshKey: unknown = 0): StorageStatus | null 
   }, [refreshKey]);
   return s;
 }
+
+/** Small per-device preference (sort order etc.). localStorage can be unavailable (private mode), so never assume it works. */
+export function usePref<T extends string | boolean>(key: string, fallback: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => {
+    try {
+      const raw = localStorage.getItem('cadence.' + key);
+      return raw === null ? fallback : (JSON.parse(raw) as T);
+    } catch { return fallback; }
+  });
+  const set = (n: T) => {
+    setV(n);
+    try { localStorage.setItem('cadence.' + key, JSON.stringify(n)); } catch { /* ignore */ }
+  };
+  return [v, set];
+}

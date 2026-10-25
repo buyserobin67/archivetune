@@ -1,40 +1,45 @@
+import { memo } from 'react';
 import type { Track } from '../lib/types';
-import { formatTime } from '../lib/storage';
 import { ui } from '../lib/ui';
 import { usePlayer } from '../lib/player';
 import { Art } from './Art';
-import { MoreIcon } from './Icons';
+import { HeartIcon, MoreIcon } from './Icons';
 
-export function TrackRow({ track, onPlay, trailing }: { track: Track; onPlay: () => void; trailing?: React.ReactNode }) {
+export const TrackRow = memo(function TrackRow({ track, onPlay, trailing, index }: { track: Track; onPlay: () => void; trailing?: React.ReactNode; index?: number }) {
   const { track: cur, isPlaying } = usePlayer();
   const active = cur?.id === track.id;
   return (
-    <div className="flex items-center gap-3 py-1.5 px-safe">
-      <button className="press flex min-w-0 flex-1 items-center gap-3 text-left" onClick={onPlay}>
+    <div className="cv-row flex items-center gap-1 pl-gutter pr-2">
+      <button className="press flex min-w-0 flex-1 items-center gap-3 py-2 text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
+        {index !== undefined && <span className="w-5 shrink-0 text-center text-footnote tabular-nums text-fg-3">{active && isPlaying ? '' : index + 1}</span>}
         <div className="relative">
-          <Art trackId={track.hasArt ? track.id : undefined} seed={track.album} className="h-12 w-12" rounded="rounded-lg" />
-          {active && isPlaying && <Bars />}
+          <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="h-12 w-12" rounded="rounded-md" />
+          {active && <Equalizer playing={isPlaying} />}
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`truncate text-[15px] font-medium ${active ? 'text-violet-300' : ''}`}>{track.title}</div>
-          <div className="truncate text-[13px] text-white/50">{track.artist} · {formatTime(track.duration)}</div>
+          <div className={`truncate text-body-lg font-medium leading-snug ${active ? 'text-accent-text' : 'text-fg'}`}>{track.title}</div>
+          <div className="truncate text-footnote text-fg-2">{track.artist}{track.album !== 'Unknown Album' ? ` · ${track.album}` : ''}</div>
         </div>
+        {track.favorite === 1 && <HeartIcon size={14} filled className="shrink-0 text-accent-text" />}
       </button>
       {trailing}
-      <button className="press p-2 text-white/50" aria-label={`More actions for ${track.title}`} onClick={() => ui.openTrackSheet(track.id)}>
+      <button className="press tap text-fg-3" aria-label={`More actions for ${track.title}`} onClick={() => ui.openTrackSheet(track.id)}>
         <MoreIcon size={20} />
       </button>
     </div>
   );
-}
+});
 
-function Bars() {
+function Equalizer({ playing }: { playing: boolean }) {
   return (
-    <div className="absolute inset-0 flex items-end justify-center gap-[3px] rounded-lg bg-black/55 pb-3">
+    <div className="absolute inset-0 flex items-center justify-center gap-[3px] rounded-md bg-black/55" aria-hidden="true">
       {[0, 1, 2].map((i) => (
-        <span key={i} className="w-[3px] rounded-full bg-violet-300" style={{ height: 14, animation: `eq 0.9s ${i * 0.15}s ease-in-out infinite alternate` }} />
+        <span
+          key={i}
+          className="h-4 w-[3px] origin-bottom rounded-full bg-accent-text"
+          style={{ transform: playing ? undefined : 'scaleY(.35)', animation: playing ? `eq .8s ${i * 0.17}s ease-in-out infinite alternate` : 'none' }}
+        />
       ))}
-      <style>{`@keyframes eq { from { transform: scaleY(.25); transform-origin: bottom } to { transform: scaleY(1); transform-origin: bottom } }`}</style>
     </div>
   );
 }

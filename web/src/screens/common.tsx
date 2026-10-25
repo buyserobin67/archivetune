@@ -1,44 +1,67 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import { ChevronLeft, NoteIcon } from '../components/Icons';
+import { FallbackCover } from '../components/Art';
+import { ChevronLeft, SearchIcon, CloseIcon } from '../components/Icons';
 import { ImportButton } from '../components/ImportButton';
-import { Art } from '../components/Art';
-import type { Group } from '../lib/library';
 
-export function Page({ title, back, action, children }: { title: string; back?: string; action?: ReactNode; children: ReactNode }) {
+/** Top-of-screen title row. Respects the Dynamic Island / status bar via --sat. */
+export function ScreenHeader({ title, eyebrow, actions }: { title: string; eyebrow?: string; actions?: ReactNode }) {
   return (
-    <div className="px-safe">
-      <header className="pt-safe flex items-center gap-1 pb-3">
-        {back && <Link to={back} className="press -ml-2 p-2 text-violet-300" aria-label="Back"><ChevronLeft size={26} /></Link>}
-        <h1 className="flex-1 truncate text-[30px] font-bold tracking-tight">{title}</h1>
-        {action}
-      </header>
-      {children}
+    <header className="flex items-end justify-between gap-3 px-gutter pb-5" style={{ paddingTop: 'calc(var(--sat) + 0.75rem)' }}>
+      <div className="min-w-0">
+        {eyebrow && <div className="eyebrow mb-0.5 truncate">{eyebrow}</div>}
+        <h1 className="line-clamp-2 break-words text-title-lg font-extrabold">{title}</h1>
+      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+    </header>
+  );
+}
+
+export function RoundButton({ label, onClick, children, tone = 'surface' }: { label: string; onClick: () => void; children: ReactNode; tone?: 'surface' | 'accent' }) {
+  return (
+    <button className={`press flex h-10 w-10 items-center justify-center rounded-full ${tone === 'accent' ? 'bg-accent text-black' : 'bg-s3 text-fg'}`} onClick={onClick} aria-label={label}>{children}</button>
+  );
+}
+
+export function BackBar({ to, right }: { to: string; right?: ReactNode }) {
+  const nav = useNavigate();
+  return (
+    <div className="relative z-10 flex items-center justify-between px-gutter" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)' }}>
+      <button className="press flex h-10 w-10 items-center justify-center rounded-full bg-black/35 backdrop-blur-sm" aria-label="Back" onClick={() => (window.history.length > 1 ? nav(-1) : nav(to))}>
+        <ChevronLeft size={24} />
+      </button>
+      {right}
     </div>
   );
 }
 
 export function EmptyState({ title, body, showImport = true }: { title: string; body: string; showImport?: boolean }) {
   return (
-    <div className="flex flex-col items-center px-6 py-16 text-center animate-fade">
-      <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-700/50 to-ink-700 text-violet-200"><NoteIcon size={36} /></div>
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="mb-6 mt-2 max-w-xs text-[15px] text-white/55">{body}</p>
+    <div className="page-enter flex flex-col items-center px-8 py-14 text-center">
+      <div className="relative mb-6 h-36 w-36 overflow-hidden rounded-xl shadow-art"><FallbackCover seed={title} /></div>
+      <h2 className="text-title font-bold">{title}</h2>
+      <p className="mb-6 mt-2 max-w-xs text-body text-fg-2">{body}</p>
       {showImport && <ImportButton />}
     </div>
   );
 }
 
-export function GroupGrid({ groups, base }: { groups: Group[]; base: string }) {
+export function SearchField({ value, onChange, placeholder, autoFocus }: { value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean }) {
   return (
-    <div className="grid grid-cols-2 gap-4 pb-6">
-      {groups.map((g) => (
-        <Link key={g.key} to={`${base}/${encodeURIComponent(g.key)}`} className="press block min-w-0">
-          <Art trackId={g.artTrackId} seed={g.name} className="w-full" rounded="rounded-2xl" />
-          <div className="mt-2 truncate text-[15px] font-semibold">{g.name}</div>
-          <div className="truncate text-[13px] text-white/50">{g.subtitle}</div>
-        </Link>
-      ))}
-    </div>
+    <label className="flex h-11 items-center gap-2 rounded-full bg-s2 px-3.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-accent">
+      <SearchIcon size={18} className="shrink-0 text-fg-3" />
+      <input
+        value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus}
+        type="search" enterKeyHint="search" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label={placeholder}
+        className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-fg-3 [&::-webkit-search-cancel-button]:hidden"
+      />
+      {value && <button className="press shrink-0 text-fg-3" onClick={() => onChange('')} aria-label="Clear search"><CloseIcon size={18} /></button>}
+    </label>
   );
+}
+
+export function Chip({ active, onClick, to, children, label }: { active?: boolean; onClick?: () => void; to?: string; children: ReactNode; label?: string }) {
+  const cls = `press inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-footnote font-semibold ${active ? 'bg-fg text-black' : 'bg-s2 text-fg-2 ring-1 ring-line'}`;
+  return to ? <Link to={to} className={cls} aria-current={active ? 'page' : undefined}>{children}</Link>
+    : <button className={cls} onClick={onClick} aria-pressed={active} aria-label={label}>{children}</button>;
 }

@@ -1,10 +1,10 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { SearchIcon } from '../components/Icons';
+import { GroupCard, GroupGrid, Section, Shelf } from '../components/Cards';
 import { TrackRow } from '../components/TrackRow';
 import { groupAlbums, groupArtists, matchesQuery } from '../lib/library';
 import { getPlayer } from '../lib/player';
 import { useTracks } from '../lib/hooks';
-import { GroupGrid, Page } from './common';
+import { ScreenHeader, SearchField } from './common';
 
 export default function Search() {
   const tracks = useTracks();
@@ -14,30 +14,29 @@ export default function Search() {
   const p = getPlayer();
   const ids = hits.map((t) => t.id);
   const searching = dq.trim().length > 0;
+  const artists = useMemo(() => groupArtists(searching ? hits : tracks ?? []), [hits, tracks, searching]);
+  const albums = useMemo(() => groupAlbums(searching ? hits : tracks ?? []), [hits, tracks, searching]);
   return (
-    <Page title="Search">
-      <div className="glass sticky z-10 mb-4 flex items-center gap-2 rounded-2xl border border-white/10 px-4" style={{ top: 'calc(var(--sat) + 4px)' }}>
-        <SearchIcon size={20} className="text-white/50" />
-        <input
-          value={q} onChange={(e) => setQ(e.target.value)} placeholder="Songs, artists, albums"
-          type="search" enterKeyHint="search" autoCapitalize="none" autoCorrect="off"
-          className="w-full bg-transparent py-3.5 text-[17px] outline-none placeholder:text-white/35"
-        />
-      </div>
-      {!searching && <p className="py-10 text-center text-white/40">Searches your whole library, on this device.</p>}
-      {searching && hits.length === 0 && <p className="py-10 text-center text-white/40">No matches for “{dq}”.</p>}
-      {searching && hits.length > 0 && (
+    <div className="page-enter">
+      <ScreenHeader title="Search" />
+      <div className="px-gutter pb-4"><SearchField value={q} onChange={setQ} placeholder="Songs, artists, albums" /></div>
+      {!searching && (tracks?.length ?? 0) > 0 && (
         <>
-          {groupArtists(hits).length > 0 && groupArtists(hits).length <= 6 && (
-            <section className="mb-2"><h2 className="mb-2 text-lg font-bold">Artists</h2><GroupGrid groups={groupArtists(hits).slice(0, 4)} base="/library/artists" /></section>
-          )}
-          {groupAlbums(hits).length > 0 && (
-            <section className="mb-2"><h2 className="mb-2 text-lg font-bold">Albums</h2><GroupGrid groups={groupAlbums(hits).slice(0, 4)} base="/library/albums" /></section>
-          )}
-          <h2 className="mb-1 text-lg font-bold">Songs</h2>
-          {hits.map((t, i) => <TrackRow key={t.id} track={t} onPlay={() => void p.playQueue(ids, i)} />)}
+          <Section title="Browse artists" to="/library/artists"><Shelf>{artists.slice(0, 12).map((g) => <GroupCard key={g.key} group={g} base="/library/artists" round />)}</Shelf></Section>
+          <Section title="Browse albums" to="/library/albums"><Shelf>{albums.slice(0, 12).map((g) => <GroupCard key={g.key} group={g} base="/library/albums" />)}</Shelf></Section>
         </>
       )}
-    </Page>
+      {!searching && (tracks?.length ?? 0) === 0 && <p className="px-gutter py-10 text-center text-fg-3">Import some music to search it here.</p>}
+      {searching && hits.length === 0 && <p className="px-gutter py-10 text-center text-fg-3">No matches for “{dq}”.</p>}
+      {searching && hits.length > 0 && (
+        <>
+          {artists.length <= 8 && <Section title="Artists"><GroupGrid groups={artists.slice(0, 4)} base="/library/artists" round /></Section>}
+          {albums.length > 0 && <Section title="Albums"><GroupGrid groups={albums.slice(0, 4)} base="/library/albums" /></Section>}
+          <Section title="Songs">
+            {hits.map((t, i) => <TrackRow key={t.id} track={t} onPlay={() => void p.playQueue(ids, i)} />)}
+          </Section>
+        </>
+      )}
+    </div>
   );
 }

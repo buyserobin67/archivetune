@@ -2,7 +2,7 @@ name: Cadence Web (build, test, deploy to GitHub Pages)
 
 on:
   push:
-    branches: [claude/cadence-web-mvp, main]
+    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, main]
     paths: ["web/**", ".github/workflows/web-pages.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web-pages.yml"]
@@ -49,13 +49,32 @@ jobs:
       - name: Verify build output
         run: node scripts/verify-dist.mjs "/${{ github.event.repository.name }}/"
 
+      # Real-browser checks at iPhone viewport sizes (layout, safe areas, playback, offline, player gestures).
+      - name: Install Chromium for E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser E2E
+        run: npm run e2e
+        env:
+          E2E_BASE: /${{ github.event.repository.name }}/
+
+      - name: Upload E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: web/e2e/screenshots
+          retention-days: 7
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
 
   deploy:
-    # Only publish from pushes to the deploy branches (never from pull requests).
-    if: github.event_name != 'pull_request'
+    # Publish from the original-version branch and main on push. The redesign branch is built and
+    # tested on every push but only published when you run the workflow manually on it, so the
+    # original site is never replaced by accident (there is one Pages site per repo).
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/claude/cadence-web-mvp' || github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:
