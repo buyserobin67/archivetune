@@ -22,7 +22,8 @@ export function Art({ trackId, seed = '', className = '', rounded = 'rounded-lg'
       style={vtName ? ({ viewTransitionName: vtName } as React.CSSProperties) : undefined}
     >
       {url ? (
-        <img src={url} alt="" className="h-full w-full animate-fade object-cover" draggable={false} decoding="async" loading={priority ? 'eager' : 'lazy'} />
+        // Absolutely positioned: the box is the square itself, never a percentage of an aspect-ratio parent.
+        <img src={url} alt="" className="absolute inset-0 h-full w-full animate-fade object-cover" draggable={false} decoding="async" loading={priority ? 'eager' : 'lazy'} />
       ) : (
         <FallbackCover seed={seed} />
       )}

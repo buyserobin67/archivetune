@@ -8,6 +8,8 @@ import { useStorageStatus, useTracks } from '../lib/hooks';
 import { ui } from '../lib/ui';
 import { ImportButton } from '../components/ImportButton';
 import { ChevronRight } from '../components/Icons';
+import { DisplayDiagnostics } from '../components/DisplayDiagnostics';
+import { ArtworkDiagnostics } from '../components/ArtworkDiagnostics';
 import { ScreenHeader } from './common';
 
 function Group({ title, footer, children }: { title: string; footer?: React.ReactNode; children: React.ReactNode }) {
@@ -102,6 +104,10 @@ export default function Settings() {
         </div>
         {busy && <p className="mt-3 text-footnote text-accent-text" role="status">Working…</p>}
       </Group>
+
+      <ArtworkDiagnostics />
+
+      <DisplayDiagnostics />
 
       <Group title="Known iOS limitations">
         <ul className="list-disc space-y-1.5 pl-5 text-footnote text-fg-2">

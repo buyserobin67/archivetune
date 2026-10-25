@@ -1,10 +1,10 @@
 """Generates tiny MP3s with ID3 tags and cover art so the E2E run exercises artwork, palettes and grouping. Pure stdlib."""
 import struct, zlib, math, os
 
-def png(w, h, fn):
+def png(w, h, fn, alpha=False):
     raw = b''.join(b'\x00' + b''.join(bytes(fn(x / w, y / h)) for x in range(w)) for y in range(h))
     def chunk(t, d): return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
-    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6 if alpha else 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
 
 def synchsafe(n): return bytes([(n >> 21) & 127, (n >> 14) & 127, (n >> 7) & 127, n & 127])
 def text(fid, s): d = b'\x03' + s.encode(); return fid + struct.pack('>I', len(d)) + b'\x00\x00' + d
@@ -38,3 +38,42 @@ for i, (t, g) in enumerate(extra):
 # synchronized lyrics (original placeholder text written for tests)
 open('e2e/fixtures/ember.lrc', 'w').write('[ti:Ember Lines]\n[00:00.50]Test lyric line one\n[00:01.50]Test lyric line two\n[00:02.50]Test lyric line three\n[00:03.50]Test lyric line four\n[00:04.50]Test lyric line five\n')
 print('ok')
+
+# ---- non-square artwork fixtures (artwork bug reproduction) ----
+def framed(w, h, inner_w, inner_h, bg, top=None):
+    """A w x h image whose centre inner_w x inner_h area is the 'real' cover; the rest is flat padding."""
+    x0, y0 = (w - inner_w) // 2, (h - inner_h) // 2
+    def px(u, v):
+        x, y = int(u * w), int(v * h)
+        if x0 <= x < x0 + inner_w and y0 <= y < y0 + inner_h:
+            return [int(40 + 200 * ((x - x0) / inner_w)), int(60 + 120 * ((y - y0) / inner_h)), 90]
+        return bg
+    return png(w, h, px)
+
+# 16:9 frame with a centred square cover on flat green side bars (what YouTube "Topic" uploads embed)
+mp3('e2e/fixtures/art-pillarbox.mp3', 'Pillarboxed Cover', 'Art Test', 'Art Test A', 1, framed(640, 360, 360, 360, [52, 74, 48]), 'Ambient', 40)
+# true landscape photo (no padding at all)
+mp3('e2e/fixtures/art-landscape.mp3', 'Landscape Cover', 'Art Test', 'Art Test B', 1, framed(640, 360, 640, 360, [0, 0, 0]), 'Ambient', 40)
+# square cover that itself contains a letterbox: square image, flat bars top and bottom
+mp3('e2e/fixtures/art-letterbox.mp3', 'Letterboxed Cover', 'Art Test', 'Art Test C', 1, framed(400, 400, 400, 225, [36, 38, 41]), 'Ambient', 40)
+# tall portrait
+mp3('e2e/fixtures/art-portrait.mp3', 'Portrait Cover', 'Art Test', 'Art Test D', 1, framed(300, 500, 300, 500, [0, 0, 0]), 'Ambient', 40)
+print('art fixtures ok')
+
+# THE USER'S CASE: a square PNG with alpha. A 16:9 frame (flat green sides around a centred square cover) sits in the
+# middle; the rows above and below are fully transparent. The app background shows through them (and iOS paints them white).
+def transparent_letterbox(size=480):
+    fh = size * 9 // 16
+    y0 = (size - fh) // 2
+    inner = fh
+    x0 = (size - inner) // 2
+    def px(u, v):
+        x, y = int(u * size), int(v * size)
+        if y < y0 or y >= y0 + fh:
+            return [0, 0, 0, 0]
+        if x0 <= x < x0 + inner:
+            return [int(40 + 120 * ((x - x0) / inner)), int(70 + 90 * ((y - y0) / fh)), 70, 255]
+        return [48, 62, 44, 255]
+    return png(size, size, px, alpha=True)
+mp3('e2e/fixtures/art-transparent.mp3', 'Transparent Bars', 'Art Test', 'Art Test E', 1, transparent_letterbox(), 'Ambient', 40)
+print('transparent fixture ok')

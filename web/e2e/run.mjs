@@ -10,7 +10,7 @@ const PORT = Number(process.env.E2E_PORT ?? 4173);
 const URL = `http://localhost:${PORT}${BASE}`;
 const FX = resolve('e2e/fixtures');
 const OUT = resolve('e2e/screenshots');
-const AUDIO = ['ember.mp3', 'tide.mp3', 'fern.mp3', 'extra0.mp3', 'extra1.mp3', 'extra2.mp3', 'extra3.mp3', 'tone-a.wav'].map((f) => `${FX}/${f}`);
+const AUDIO = ['ember.mp3', 'tide.mp3', 'fern.mp3', 'extra0.mp3', 'extra1.mp3', 'extra2.mp3', 'extra3.mp3', 'tone-a.wav', 'art-transparent.mp3', 'art-pillarbox.mp3', 'art-landscape.mp3', 'art-letterbox.mp3', 'art-portrait.mp3'].map((f) => `${FX}/${f}`);
 const IMPORT_ALL = [...AUDIO, `${FX}/ember.lrc`, `${FX}/ember.mp3`]; // + lyric sidecar + a duplicate
 
 const VIEWPORTS = [
@@ -155,7 +155,12 @@ async function run() {
       await shot(page, '2-library-songs');
       await noOverflow(page, '#main', 'library songs');
       const count = await page.locator('[aria-label^="Play "][aria-label*=" by "]').count();
-      check(count === 8, `library lists 8 unique songs (duplicate skipped), got ${count}`);
+      check(count === 13, `library lists 13 unique songs (duplicate skipped), got ${count}`);
+      const catRow = page.locator('nav[aria-label="Library sections"] a');
+      check(await catRow.count() === 5, 'library has one compact category row (Songs, Albums, Artists, Playlists, Downloads)');
+      check(await page.getByRole('button', { name: 'Favorites', exact: true }).count() === 0, 'no favorites chip cluttering the library (it lives in the menu)');
+      const playBtn = await rect(page, '[aria-label="Play"]');
+      check(playBtn && playBtn.h <= 36 * (vp.textScale ?? 1) + 1, `library Play/Shuffle are small (${Math.round(playBtn?.h ?? 0)}px)`);
       await page.getByRole('link', { name: 'Albums' }).click();
       await page.waitForSelector('text=Afterglow');
       await page.waitForTimeout(300);
@@ -164,8 +169,13 @@ async function run() {
       await page.getByRole('link', { name: 'Downloads' }).click();
       await page.waitForSelector('text=No licensed downloads yet');
       await page.getByRole('link', { name: 'Songs' }).click();
-      await page.getByRole('button', { name: /Sort by/ }).click();
+      await page.getByRole('button', { name: 'Sort and filter' }).click();
       await page.getByRole('button', { name: 'Duration' }).click();
+      await page.getByRole('button', { name: 'Favorites only' }).click();
+      check(page.url().includes('/library/favorites'), 'favorites filter lives in the sort & filter menu');
+      await page.getByRole('button', { name: 'Sort and filter' }).click();
+      await page.getByRole('button', { name: 'Favorites only' }).click();
+      check(page.url().includes('/library/songs'), 'favorites filter toggles back off');
       await page.getByPlaceholder('Search songs').fill('afterglow');
       await page.waitForTimeout(250);
       check(await page.locator('[aria-label^="Play "][aria-label*=" by "]').count() === 2, 'library search filters by album');
@@ -196,8 +206,9 @@ async function run() {
       await page.getByRole('button', { name: 'Back' }).click();
 
       // ---- playback + mini player ----
-      await page.getByRole('link', { name: 'Home' }).click();
+      await page.locator('nav[aria-label="Primary"]').getByRole('link', { name: 'Library' }).click();
       await page.getByRole('button', { name: /^Play Ember Lines/ }).first().click();
+      await page.locator('nav[aria-label="Primary"]').getByRole('link', { name: 'Home' }).click();
       await page.waitForSelector('[aria-label^="Open player"]');
       await page.waitForTimeout(1000);
       await shot(page, '5-home-miniplayer');
@@ -206,6 +217,8 @@ async function run() {
       check(mini && dock && mini.b <= dock.y + 1, 'mini player sits directly above the tab bar', JSON.stringify({ mini, dock }));
       const gap = dock.y - (await page.evaluate(() => document.querySelector('[aria-label^="Open player"]').closest('.relative').getBoundingClientRect().bottom));
       check(gap >= 0 && gap <= 16, `mini player is within 16px of the tab bar (gap ${Math.round(gap)}px)`);
+      const miniBox = await page.evaluate(() => document.querySelector('[aria-label^="Open player"]').closest('.relative').getBoundingClientRect().height);
+      check(miniBox <= 56 * (vp.textScale ?? 1) + 2, `mini player is compact (${Math.round(miniBox)}px)`);
       check(await page.locator('text=Keep listening').count() === 1, 'Keep listening appears after a song has been played');
 
       // ---- Now Playing ----
@@ -224,7 +237,8 @@ async function run() {
       check(play && pills && play.b <= pills.y + 2, 'controls are above the Queue / Sleep / Lyrics pills', JSON.stringify({ play, pills }));
       check(pills && pills.b <= vp.height - vp.safe.bottom + 1, 'pills clear the home indicator', JSON.stringify({ pills, safe: vp.safe }));
       check(art && art.w >= 140 && art.x >= 0 && art.r <= vp.width, `cover is large and inside the viewport (${Math.round(art?.w ?? 0)}px)`, JSON.stringify(art));
-      check(art && hdr && art.y - hdr.b < vp.height * 0.14, 'no large empty gap between header and cover', JSON.stringify({ hdr, art }));
+      check(art && art.w <= 320 * (vp.textScale ?? 1) + 1, `cover has a sensible maximum size (${Math.round(art?.w ?? 0)}px)`, JSON.stringify(art));
+      check(art && hdr && art.y - hdr.b < vp.height * 0.22, 'cover sits close under the header (no giant gap)', JSON.stringify({ hdr, art }));
       const radius = await page.evaluate((s) => { const e = document.querySelector(s); return e ? parseFloat(getComputedStyle(e).borderTopLeftRadius) : -1; }, `${P} [aria-label="Pause"]`);
       check(play && Math.abs(play.w - play.h) <= 1 && radius > 8 && radius < play.w / 2 - 4, `play/pause is a rounded square (${Math.round(play?.w)}px, radius ${radius}px)`);
       for (const l of ['Shuffle off', 'Previous track', 'Next track', 'Repeat off']) check(await page.locator(`${P} [aria-label="${l}"]`).count() === 1, `control present: ${l}`);
@@ -289,7 +303,8 @@ async function run() {
       await page.click(`${P} [aria-label="Show queue"]`);
       await page.waitForTimeout(500);
       await shot(page, '8-queue');
-      check(await page.locator(P).getByText(/Up next/).count() === 1, 'queue view opens');
+      check(await page.locator(P).getByRole('heading', { name: /Up next/ }).count() === 1, 'queue view opens');
+      check(await page.locator(`${P} section[aria-label="Now playing"]`).count() === 1, 'queue shows the current song in its own Now playing section');
       await noOverflow(page, P, 'queue');
       const tr = await rect(page, `${P} [aria-label="Pause"]`);
       check(tr && tr.b <= vp.height - vp.safe.bottom + 1, 'queue: transport clears the home indicator');
@@ -306,6 +321,115 @@ async function run() {
       check(await page.locator(`${P} [aria-label="Close player"]`).count() === 1, 'player re-opens after a swipe dismiss');
       await page.click(`${P} [aria-label="Close player"]`);
       await page.waitForTimeout(700);
+
+      // ---- artwork: square, landscape, pillarboxed, letterboxed (flat bars) and transparent-bar covers ----
+      if (vp.name === 'iphone-390x844' || vp.name === 'standalone-402x874') {
+        const BG = [36, 38, 41]; // --surface-2: the card colour that shows through transparent pixels
+        const bgShare = async (title) => {
+          const card = page.locator('main a[href*="albums/"]', { hasText: title }).locator('.aspect-square').first();
+          await card.evaluate((el) => el.scrollIntoView({ block: 'center' })); // keep it clear of the floating dock
+          await card.locator('img').first().evaluate((img) => img.decode().catch(() => {}));
+          await page.waitForTimeout(450); // lazy load + 260ms fade-in
+          const buf = await card.screenshot();
+          if (process.env.E2E_DEBUG_ART) await card.screenshot({ path: `${OUT}/${vp.name}/art-${title.replace(/ /g, '-')}.png` });
+          return page.evaluate(async ([b64, bg]) => {
+            const u8 = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+            const bmp = await createImageBitmap(new Blob([u8], { type: 'image/png' }));
+            const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+            const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0);
+            const d = x.getImageData(0, 0, c.width, c.height).data;
+            const mx = Math.round(c.width * 0.12), my = Math.round(c.height * 0.12); // skip rounded corners and the ring
+            let n = 0, tot = 0;
+            for (let yy = my; yy < c.height - my; yy++) for (let xx = mx; xx < c.width - mx; xx++) {
+              const i = (yy * c.width + xx) * 4; tot++;
+              if (Math.abs(d[i] - bg[0]) <= 3 && Math.abs(d[i + 1] - bg[1]) <= 3 && Math.abs(d[i + 2] - bg[2]) <= 3) n++;
+            }
+            return n / tot;
+          }, [buf.toString('base64'), BG]);
+        };
+        await page.goto(`${URL}#/library/albums`);
+        await page.waitForSelector('text=Art Test E');
+        await page.waitForTimeout(2200); // background trim pass
+        await shot(page, '13-albums-artwork');
+        check(await bgShare('Art Test A') < 0.02, 'pillarboxed 16:9 cover fills the square (no bars)');
+        check(await bgShare('Art Test B') < 0.02, 'landscape cover fills the square (no bars)');
+        check(await bgShare('Art Test D') < 0.02, 'portrait cover fills the square (no bars)');
+        const eShare = await bgShare('Art Test E');
+        const eNat = await page.evaluate(() => { const a = [...document.querySelectorAll('main a[href*="albums/"]')].find((x) => x.innerText.includes('Art Test E')); const i = a?.querySelector('img'); return i ? `${i.naturalWidth}x${i.naturalHeight} ${i.currentSrc.slice(0, 30)} complete=${i.complete}` : 'no img'; });
+        const edits = await page.evaluate(() => new Promise((res) => { const r = indexedDB.open('cadence'); r.onsuccess = () => { r.result.transaction('artEdits').objectStore('artEdits').getAll().onsuccess = (e) => res(e.target.result.map((x) => `${x.kind}:${!!x.blob}:${x.disabled ? 'off' : 'on'}`).join(',')); }; }));
+        check(eShare < 0.02, 'cover with transparent bars is trimmed automatically (no bars)', `share=${eShare} img=${eNat} edits=${edits}`);
+        const flatBefore = await bgShare('Art Test C');
+        check(flatBefore > 0.2, `opaque flat letterbox is NOT touched automatically (${Math.round(flatBefore * 100)}% bars)`);
+
+        // diagnostics: report what is inside each image, and what the renderer does with it
+        await page.goto(`${URL}#/settings`);
+        await page.getByRole('button', { name: 'Scan artwork' }).click();
+        await page.waitForSelector('ul[aria-label="Artwork scan results"] li');
+        await page.waitForTimeout(500);
+        const rows = await page.locator('ul[aria-label="Artwork scan results"] li').allInnerTexts();
+        const rowOf = (t) => rows.find((r) => r.includes(t)) ?? '';
+        check(/480×480.*PNG.*alpha, \d+% transparent/s.test(rowOf('Transparent Bars')) && /Transparent border: \d+px top, \d+px bottom/.test(rowOf('Transparent Bars')), 'diagnostics: transparent bars are reported with real size, alpha share and border thickness', rowOf('Transparent Bars'));
+        check(/Flat #242629 border/.test(rowOf('Letterboxed Cover')), 'diagnostics: flat letterbox is reported with its colour', rowOf('Letterboxed Cover'));
+        check(/no borders/.test(rowOf('Landscape Cover')) && /640×360/.test(rowOf('Landscape Cover')), 'diagnostics: landscape image reported as such, not as a defect', rowOf('Landscape Cover'));
+        check(rows.length >= 10 && rows.every((r) => /Render check: OK/.test(r)), `render check passes for all ${rows.length} covers (rendering is not the problem)`, rows.filter((r) => !/Render check: OK/.test(r)).join(' / '));
+        await shot(page, '14-artwork-diagnostics');
+        await page.locator('ul[aria-label="Artwork scan results"] li', { hasText: 'Letterboxed Cover' }).getByRole('button', { name: 'Trim' }).click();
+        await page.waitForSelector('ul[aria-label="Artwork scan results"] li:has-text("Letterboxed Cover") button:has-text("Use original")');
+        await page.goto(`${URL}#/library/albums`);
+        await page.waitForSelector('text=Art Test C');
+        await page.waitForTimeout(600);
+        check(await bgShare('Art Test C') < 0.02, 'manual trim removes flat letterbox bars');
+        // undo: the original bytes come back and so do the bars (this is the user's reported look)
+        await page.goto(`${URL}#/settings`);
+        await page.getByRole('button', { name: 'Scan artwork' }).click();
+        await page.waitForSelector('ul[aria-label="Artwork scan results"] li');
+        await page.locator('ul[aria-label="Artwork scan results"] li', { hasText: 'Transparent Bars' }).getByRole('button', { name: 'Use original' }).click();
+        await page.waitForTimeout(600);
+        await page.goto(`${URL}#/library/albums`);
+        await page.waitForSelector('text=Art Test E');
+        await page.waitForTimeout(600);
+        const bars = await bgShare('Art Test E');
+        check(bars > 0.2, `"Use original" restores the untouched image, bars included (${Math.round(bars * 100)}% bars): the bars are in the file`);
+        await shot(page, '15-artwork-original-restored');
+        await page.goto(`${URL}#/settings`);
+        await page.getByRole('button', { name: 'Scan artwork' }).click();
+        await page.waitForSelector('ul[aria-label="Artwork scan results"] li');
+        await page.locator('ul[aria-label="Artwork scan results"] li', { hasText: 'Transparent Bars' }).getByRole('button', { name: 'Trim' }).click();
+        await page.waitForTimeout(600);
+        await page.goto(`${URL}#/library/albums`);
+        await page.waitForSelector('text=Art Test E');
+        await page.waitForTimeout(600);
+        check(await bgShare('Art Test E') < 0.02, 'trimming again after undo works');
+        await page.goto(`${URL}#/`);
+
+        // queue: a single song is current only, never also "up next"; repeat modes explained
+        await page.goto(`${URL}#/search`);
+        await page.getByPlaceholder('Songs, artists, albums').fill('Pillarboxed');
+        await page.getByRole('button', { name: /^Play Pillarboxed Cover/ }).first().click();
+        await page.waitForTimeout(600);
+        await page.click('[aria-label^="Open player"]');
+        await page.waitForTimeout(700);
+        await page.click(`${P} [aria-label="Show queue"]`);
+        await page.waitForTimeout(400);
+        const state = async () => ({
+          removeButtons: await page.locator(`${P} [aria-label^="Remove "]`).count(),
+          text: await page.locator(P).innerText(),
+        });
+        let st = await state();
+        const rep = await page.locator(`${P} [aria-label^="Repeat"]`).getAttribute('aria-label');
+        if (rep === 'Repeat one') { await page.click(`${P} [aria-label="Repeat one"]`); st = await state(); }
+        check(st.removeButtons === 0 && /Nothing queued after this song/.test(st.text), 'single-song queue: nothing under "Up next", current song not repeated there');
+        await shot(page, '6c-queue-single');
+        await page.click(`${P} [aria-label="Repeat off"]`);
+        st = await state();
+        check(st.removeButtons === 0 && /Repeat is on/.test(st.text), 'single song + repeat all: explained, still not listed as up next');
+        await page.click(`${P} [aria-label="Repeat all"]`);
+        st = await state();
+        check(st.removeButtons === 0 && /Repeating/.test(st.text), 'single song + repeat one: explained, not listed as up next');
+        await page.click(`${P} [aria-label="Repeat one"]`); // back to off
+        await page.click(`${P} [aria-label="Close player"]`);
+        await page.waitForTimeout(500);
+      }
 
       // ---- offline (once) ----
       if (vp.name === 'iphone-390x844') {

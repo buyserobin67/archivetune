@@ -82,3 +82,19 @@ export interface ParsedMeta {
   trackNo?: number;
   art?: Blob;
 }
+
+/**
+ * A non-destructive artwork adjustment. The original bytes stay in the `art` store untouched; this row holds a trimmed
+ * copy that is shown instead. `disabled` means "the user chose the original", `clean` means "scanned, nothing to trim".
+ */
+export interface ArtEdit {
+  trackId: string;
+  blob?: Blob;
+  kind: 'transparent' | 'flat' | 'clean';
+  disabled?: boolean;
+  /** Trim rectangle in source pixels. */
+  rect?: { x: number; y: number; w: number; h: number };
+  from?: { w: number; h: number };
+  to?: { w: number; h: number };
+  createdAt: number;
+}

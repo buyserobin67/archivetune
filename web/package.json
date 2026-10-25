@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "icons": "node scripts/make-icons.mjs",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "e2e:webkit-art": "node e2e/webkit-art.mjs"
   },
   "dependencies": {
     "dexie": "^4.4.7",

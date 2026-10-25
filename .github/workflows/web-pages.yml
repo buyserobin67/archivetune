@@ -2,7 +2,7 @@ name: Cadence Web (build, test, deploy to GitHub Pages)
 
 on:
   push:
-    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, main]
+    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, main]
     paths: ["web/**", ".github/workflows/web-pages.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web-pages.yml"]
@@ -55,6 +55,15 @@ jobs:
 
       - name: Browser E2E
         run: npm run e2e
+        env:
+          E2E_BASE: /${{ github.event.repository.name }}/
+
+      # Same artwork pixel checks in real WebKit (the engine behind Safari and iOS web apps).
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+
+      - name: Artwork rendering in WebKit
+        run: npm run e2e:webkit-art
         env:
           E2E_BASE: /${{ github.event.repository.name }}/
 

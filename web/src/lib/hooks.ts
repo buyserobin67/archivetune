@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { getArtUrl } from './art';
+import { artVersion, getArtUrl, subscribeArt } from './art';
 import { getStorageStatus, type StorageStatus } from './storage';
 import type { Playlist, Track } from './types';
 
@@ -14,14 +14,17 @@ export function usePlaylists(): Playlist[] | undefined {
 }
 
 export function useArt(trackId?: string): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+  const [state, setState] = useState<{ id?: string; url: string | null }>({ url: null });
+  // Re-run when this track's artwork is edited or restored.
+  const version = useSyncExternalStore(subscribeArt, () => (trackId ? artVersion(trackId) : 0));
   useEffect(() => {
     let live = true;
-    setUrl(null);
-    if (trackId) void getArtUrl(trackId).then((u) => live && setUrl(u));
+    if (!trackId) { setState({ url: null }); return; }
+    void getArtUrl(trackId).then((u) => live && setState({ id: trackId, url: u }));
     return () => { live = false; };
-  }, [trackId]);
-  return url;
+  }, [trackId, version]);
+  // Never show the previous track's cover while the next one loads.
+  return state.id === trackId ? state.url : null;
 }
 
 export function useStorageStatus(refreshKey: unknown = 0): StorageStatus | null {

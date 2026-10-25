@@ -1,5 +1,6 @@
 import { db as defaultDb, newId, type CadenceDB } from './db';
 import { isQuotaError, StorageQuotaError } from './errors';
+import { autoTrimNew, browserArtProcessor, type ArtProcessor } from './artEdits';
 import { attachSidecars, isLyricFile } from './lyrics';
 import { sha256Hex } from './hash';
 import { guessMime, looksLikeAudio, parseTags, titleFromFileName, type MetaParser } from './metadata';
@@ -9,6 +10,8 @@ export interface ImportOptions {
   db?: CadenceDB;
   parse?: MetaParser;
   license?: LicenseInfo;
+  /** Image trimming backend. Defaults to the browser one; tests pass null or a fake. */
+  artProcessor?: ArtProcessor | null;
   onProgress?: (done: number, total: number, name: string) => void;
 }
 
@@ -73,6 +76,8 @@ export async function importFile(file: File | Blob, name: string, opts: ImportOp
     if (isQuotaError(e)) throw new StorageQuotaError();
     throw e;
   }
+  // Best effort and after the atomic write: trims transparent artwork borders into a separate copy (original kept).
+  if (meta.art) await autoTrimNew(id, opts.artProcessor === undefined ? browserArtProcessor : opts.artProcessor, d).catch(() => {});
   return { status: 'added', track };
 }
 
@@ -111,9 +116,10 @@ export async function importFiles(files: File[], opts: ImportOptions = {}): Prom
 }
 
 export async function deleteTrack(id: string, d: CadenceDB = defaultDb): Promise<void> {
-  await d.transaction('rw', [d.tracks, d.blobs, d.art, d.playlists, d.lyrics], async () => {
+  await d.transaction('rw', [d.tracks, d.blobs, d.art, d.playlists, d.lyrics, d.artEdits], async () => {
     await d.tracks.delete(id);
     await d.lyrics.delete(id);
+    await d.artEdits.delete(id);
     await d.blobs.delete(id);
     await d.art.delete(id);
     const lists = await d.playlists.toArray();

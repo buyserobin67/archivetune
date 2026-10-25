@@ -8,6 +8,7 @@ import { addToPlaylist, createPlaylist } from '../lib/playlists';
 import { usePlaylists } from '../lib/hooks';
 import { formatBytes, formatTime } from '../lib/storage';
 import { ui, useUI } from '../lib/ui';
+import { browserArtProcessor, trimTrack, useOriginal } from '../lib/artEdits';
 import { Art } from './Art';
 import { CheckIcon, HeartIcon, NoteIcon, PlayIcon, PlusIcon, QueueIcon, TrashIcon } from './Icons';
 
@@ -48,6 +49,7 @@ export function TrackSheet() {
   const track = useLiveQuery(() => (sheetTrackId ? db.tracks.get(sheetTrackId) : undefined), [sheetTrackId]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => setConfirmDelete(false), [sheetTrackId]);
+  const artEdit = useLiveQuery(() => (sheetTrackId ? db.artEdits.get(sheetTrackId) : undefined), [sheetTrackId]);
   if (!sheetTrackId || !track) return null;
   const p = getPlayer();
   const close = ui.closeTrackSheet;
@@ -64,6 +66,11 @@ export function TrackSheet() {
       <SheetItem icon={<QueueIcon size={20} />} label="Add to queue" onClick={() => { p.enqueue([track.id]); ui.toast('Added to queue'); close(); }} />
       <SheetItem icon={<HeartIcon size={20} filled={!!track.favorite} />} label={track.favorite ? 'Remove from favorites' : 'Add to favorites'} onClick={() => { void toggleFavorite(track.id); close(); }} />
       <SheetItem icon={<PlusIcon size={20} />} label="Add to playlist" onClick={() => { close(); ui.openPlaylistPicker([track.id]); }} />
+      {track.hasArt && browserArtProcessor && (artEdit?.blob && !artEdit.disabled ? (
+        <SheetItem icon={<NoteIcon size={20} />} label="Use original artwork" onClick={async () => { await useOriginal(track.id); ui.toast('Using the original artwork'); close(); }} />
+      ) : (
+        <SheetItem icon={<NoteIcon size={20} />} label="Trim artwork borders" onClick={async () => { const r = await trimTrack(track.id, browserArtProcessor!, { flat: true }); ui.toast(r === 'trimmed' ? 'Artwork trimmed (original kept)' : r === 'clean' ? 'No borders found' : 'Could not trim'); close(); }} />
+      ))}
       {track.license && (
         <div className="my-2 rounded-lg bg-s3 p-3 text-footnote leading-relaxed text-fg-2">
           <div className="font-semibold text-fg">License: {track.license.name}</div>

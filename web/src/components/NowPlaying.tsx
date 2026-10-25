@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import * as Q from '../lib/queue';
 import { db } from '../lib/db';
 import { toggleFavorite } from '../lib/library';
 import { removeLyrics } from '../lib/lyrics';
@@ -144,21 +145,22 @@ function NowTab({ track, touch }: { track: Track; touch: Touchy }) {
   return (
     <>
       <Header eyebrow="Playing from" title={track.album === 'Unknown Album' ? track.artist : track.album} touch={touch} />
-      <div className="flex min-h-0 flex-1 flex-col px-gutter" style={{ touchAction: 'none' }} onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd}>
-        {/* The stage measures itself; the cover is the largest square that fits (container query units). */}
-        <div className="flex min-h-0 flex-1 items-center justify-center py-2" style={{ containerType: 'size' }}>
-          <div className="aspect-square transition-transform duration-slow ease-spring" style={{ width: 'min(100cqw, 100cqh, 26rem)', transform: s.isPlaying ? 'scale(1)' : 'scale(.9)' }}>
-            <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="h-full w-full" rounded="rounded-[1.25rem]" vtName={playerOpen ? 'cadence-art' : undefined} shadow priority />
-          </div>
+      {/* Cover + title are one group, centred in the free space. The cover is capped (20rem, 42% of the height) so tall phones don't get a giant cover. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-gutter" style={{ touchAction: 'none', ['--cw' as string]: 'min(100%, 20rem)' }} onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd}>
+        {/* my-auto centres the group when there is room and lets it scroll (instead of overlapping the controls) when text is very large. */}
+        <div className="my-auto flex w-full flex-col items-center gap-4 py-2">
+        <div className="w-[min(var(--cw),42dvh,max(7.5rem,calc(100dvh-22rem-var(--sat)-var(--sab))))] transition-transform duration-slow ease-spring" style={{ transform: s.isPlaying ? 'scale(1)' : 'scale(.92)' }}>
+          <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-[1.25rem]" vtName={playerOpen ? 'cadence-art' : undefined} shadow priority />
         </div>
-        <div className="mx-auto flex w-full max-w-[26rem] shrink-0 items-center gap-3 pb-1 pt-2" style={{ touchAction: 'auto' }}>
+        <div className="flex w-[var(--cw)] items-center gap-2" style={{ touchAction: 'auto' }}>
           <div className="min-w-0 flex-1">
             <h2 className="line-clamp-2 text-title font-bold leading-tight">{track.title}</h2>
             <div className="truncate text-body text-fg-2">{track.artist}</div>
             {track.license && <div className="truncate text-caption text-fg-3">{track.license.name} · {track.license.attribution}</div>}
           </div>
-          <CircleButton size="md" label={fav ? 'Remove from favorites' : 'Add to favorites'} pressed={!!fav} onClick={() => void toggleFavorite(track.id)}><HeartIcon size={20} filled={!!fav} /></CircleButton>
-          <CircleButton size="md" label="More actions" onClick={() => ui.openTrackSheet(track.id)}><MoreIcon size={20} /></CircleButton>
+          <CircleButton label={fav ? 'Remove from favorites' : 'Add to favorites'} pressed={!!fav} onClick={() => void toggleFavorite(track.id)}><HeartIcon size={18} filled={!!fav} /></CircleButton>
+          <CircleButton label="More actions" onClick={() => ui.openTrackSheet(track.id)}><MoreIcon size={18} /></CircleButton>
+        </div>
         </div>
       </div>
       <Transport />
@@ -170,49 +172,72 @@ function QueueTab({ track, touch }: { track: Track; touch: Touchy }) {
   const s = usePlayer();
   const p = getPlayer();
   const tracks = useLiveQuery(() => db.tracks.bulkGet(s.queue.items), [s.queue.items]);
-  const { items, index } = s.queue;
-  const list = useRef<HTMLDivElement>(null);
-  // Open with the current song at the top of the list so upcoming songs are visible.
-  useEffect(() => {
-    const c = list.current, cur = c?.querySelector<HTMLElement>('[data-current="true"]');
-    if (c && cur) c.scrollTo({ top: Math.max(0, cur.offsetTop - 4) });
-  }, [index, tracks?.length]);
+  const { items, index, repeat } = s.queue;
+  const [showHistory, setShowHistory] = useState(false);
+  const after = Q.afterCurrent(s.queue);
+  const nextCount = Q.upcoming(s.queue).length;
+  const byIndex = (i: number) => tracks?.[i] ?? null;
+  const title = (i: number) => byIndex(i)?.title ?? 'this song';
+  const row = (i: number, opts: { controls: boolean; dim?: boolean }) => {
+    const t = byIndex(i);
+    if (!t) return null;
+    return (
+      <div key={`${items[i]}:${i}`} className={`flex items-center gap-1 pl-gutter pr-1 ${opts.dim ? 'opacity-55' : ''}`}>
+        <button className="press flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left" onClick={() => void p.playIndex(i)}>
+          <Art trackId={t.hasArt ? t.id : undefined} seed={`${t.album}|${t.artist}`} className="h-10 w-10" rounded="rounded-md" />
+          <div className="min-w-0">
+            <div className="truncate text-body font-medium">{t.title}</div>
+            <div className="truncate text-caption text-fg-2">{t.artist}</div>
+          </div>
+        </button>
+        {opts.controls && (
+          <>
+            <button className="press tap text-fg-3 disabled:opacity-20" disabled={i <= index + 1} onClick={() => p.moveInQueue(i, i - 1)} aria-label={`Move ${t.title} up`}><UpIcon size={18} /></button>
+            <button className="press tap text-fg-3 disabled:opacity-20" disabled={i === items.length - 1} onClick={() => p.moveInQueue(i, i + 1)} aria-label={`Move ${t.title} down`}><DownIcon size={18} /></button>
+            <button className="press tap text-fg-3" onClick={() => void p.removeFromQueue(i)} aria-label={`Remove ${t.title} from queue`}><TrashIcon size={18} /></button>
+          </>
+        )}
+      </div>
+    );
+  };
   return (
     <>
       <Header eyebrow="Queue" title={`${items.length} song${items.length === 1 ? '' : 's'}${s.queue.shuffle ? ' · shuffled' : ''}`} touch={touch} />
       <div className="flex min-h-0 flex-1 animate-fade flex-col">
-        <div className="flex items-center gap-3 px-gutter py-2">
+        {/* The song that is playing is its own section. It is never listed under "Up next". */}
+        <section aria-label="Now playing" className="mx-gutter flex items-center gap-3 rounded-xl bg-white/[0.07] p-2.5">
           <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="h-12 w-12" rounded="rounded-lg" shadow />
           <div className="min-w-0 flex-1">
             <div className="eyebrow">Now playing</div>
             <div className="truncate text-body font-semibold">{track.title}</div>
             <div className="truncate text-footnote text-fg-2">{track.artist}</div>
           </div>
+        </section>
+
+        <div className="flex items-center justify-between px-gutter pb-1 pt-4">
+          <h3 className="eyebrow">Up next{nextCount ? ` · ${nextCount}` : ''}</h3>
+          {nextCount > 0 && <button className="press text-footnote font-semibold" onClick={() => p.clearUpcoming()}>Clear</button>}
         </div>
-        <div className="flex items-center justify-between px-gutter pb-1 pt-2">
-          <div className="eyebrow">Up next · {Math.max(items.length - index - 1, 0)}</div>
-          {index < items.length - 1 && <button className="press text-footnote font-semibold" onClick={() => p.clearUpcoming()}>Clear</button>}
-        </div>
-        <div ref={list} className="scroll-y hide-scroll relative min-h-0 flex-1" style={{ maskImage: 'linear-gradient(to bottom, transparent, #000 0.75rem, #000 calc(100% - 0.75rem), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 0.75rem, #000 calc(100% - 0.75rem), transparent)' }}>
-          {items.map((id, i) => {
-            const t = tracks?.[i];
-            if (!t) return null;
-            const cur = i === index;
-            return (
-              <div key={id + i} data-current={cur} className={`flex items-center gap-1 pl-gutter pr-1 ${i < index ? 'opacity-45' : ''} ${cur ? 'bg-white/[0.06]' : ''}`}>
-                <button className="press flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left" onClick={() => void p.playIndex(i)}>
-                  <Art trackId={t.hasArt ? t.id : undefined} seed={`${t.album}|${t.artist}`} className="h-10 w-10" rounded="rounded-md" />
-                  <div className="min-w-0">
-                    <div className={`truncate text-body font-medium ${cur ? 'text-art-text' : ''}`}>{t.title}</div>
-                    <div className="truncate text-caption text-fg-2">{t.artist}</div>
-                  </div>
-                </button>
-                <button className="press tap text-fg-3 disabled:opacity-20" disabled={i === 0} onClick={() => p.moveInQueue(i, i - 1)} aria-label={`Move ${t.title} up`}><UpIcon size={18} /></button>
-                <button className="press tap text-fg-3 disabled:opacity-20" disabled={i === items.length - 1} onClick={() => p.moveInQueue(i, i + 1)} aria-label={`Move ${t.title} down`}><DownIcon size={18} /></button>
-                <button className="press tap text-fg-3" onClick={() => void p.removeFromQueue(i)} aria-label={`Remove ${t.title} from queue`}><TrashIcon size={18} /></button>
-              </div>
-            );
-          })}
+        <div className="scroll-y hide-scroll relative min-h-0 flex-1" style={{ maskImage: 'linear-gradient(to bottom, transparent, #000 0.5rem, #000 calc(100% - 0.75rem), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 0.5rem, #000 calc(100% - 0.75rem), transparent)' }}>
+          {after.kind === 'repeat-one' && <p className="px-gutter py-2 text-footnote text-fg-2">Repeating “{track.title}”. Turn repeat off to continue to the next song.</p>}
+          {nextCount === 0 && after.kind !== 'repeat-one' && (
+            <p className="px-gutter py-2 text-footnote text-fg-2">
+              {after.kind === 'wrap'
+                ? after.same ? `Repeat is on: “${track.title}” will play again.` : `Nothing else is queued. Repeat is on, so playback returns to “${title(0)}”.`
+                : 'Nothing queued after this song. Add songs from the ••• menu.'}
+            </p>
+          )}
+          {Q.upcoming(s.queue).map((_, k) => row(index + 1 + k, { controls: true }))}
+          {repeat === 'all' && nextCount > 0 && <p className="px-gutter py-2 text-caption text-fg-3">Then repeats from “{title(0)}”.</p>}
+
+          {Q.history(s.queue).length > 0 && (
+            <>
+              <button className="press px-gutter pb-1 pt-4 text-left text-footnote font-semibold text-fg-2" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory}>
+                {showHistory ? 'Hide' : 'Show'} previously played ({Q.history(s.queue).length})
+              </button>
+              {showHistory && Q.history(s.queue).map((_, i) => row(i, { controls: false, dim: true }))}
+            </>
+          )}
           <div className="h-2" />
         </div>
       </div>

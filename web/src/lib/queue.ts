@@ -126,3 +126,28 @@ export function prune(q: QueueState, exists: (id: string) => boolean): QueueStat
   const idx = cur ? items.indexOf(cur) : -1;
   return { ...q, items, original, index: idx >= 0 ? idx : items.length ? 0 : -1 };
 }
+
+// ---- what the Queue screen shows ----
+
+/** Entries after the current one. The current entry is never part of this list. */
+export const upcoming = (q: QueueState): string[] => (q.index < 0 ? [] : q.items.slice(q.index + 1));
+
+/** Entries already played (before the current one). */
+export const history = (q: QueueState): string[] => (q.index < 0 ? [] : q.items.slice(0, q.index));
+
+export type AfterCurrent =
+  | { kind: 'next'; id: string }
+  | { kind: 'repeat-one' }
+  /** End of queue with repeat-all: playback wraps to the first entry. `same` = it is the song that is playing now. */
+  | { kind: 'wrap'; id: string; same: boolean }
+  | { kind: 'stop' };
+
+/** What happens when the current song ends. Mirrors `next(q, true)`, but also says which song comes next. */
+export function afterCurrent(q: QueueState): AfterCurrent {
+  if (q.index < 0 || !q.items.length) return { kind: 'stop' };
+  if (q.repeat === 'one') return { kind: 'repeat-one' };
+  const up = upcoming(q);
+  if (up.length) return { kind: 'next', id: up[0] };
+  if (q.repeat === 'all') return { kind: 'wrap', id: q.items[0], same: q.items.length === 1 };
+  return { kind: 'stop' };
+}

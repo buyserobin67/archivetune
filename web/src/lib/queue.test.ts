@@ -109,3 +109,83 @@ describe('queue operations', () => {
     expect(Q.prune(start(seq(2), 0), () => false).index).toBe(-1);
   });
 });
+
+describe('queue screen selectors', () => {
+  const at = (ids: string[], i: number, repeat: 'off' | 'all' | 'one' = 'off'): Q.QueueState => ({ ...Q.setQueue(Q.emptyQueue(), ids, i), repeat });
+
+  it('single-song queue: nothing is upcoming, the song is current only', () => {
+    const q = at(['a'], 0);
+    expect(Q.upcoming(q)).toEqual([]);
+    expect(Q.history(q)).toEqual([]);
+    expect(Q.currentId(q)).toBe('a');
+    expect(Q.afterCurrent(q)).toEqual({ kind: 'stop' });
+  });
+
+  it('multiple tracks: upcoming and history exclude the current one', () => {
+    const q = at(['a', 'b', 'c', 'd'], 1);
+    expect(Q.history(q)).toEqual(['a']);
+    expect(Q.upcoming(q)).toEqual(['c', 'd']);
+    expect([...Q.history(q), Q.currentId(q), ...Q.upcoming(q)]).toEqual(q.items);
+    expect(Q.afterCurrent(q)).toEqual({ kind: 'next', id: 'c' });
+  });
+
+  it('last track of several: upcoming is empty and playback stops with repeat off', () => {
+    const q = at(['a', 'b', 'c'], 2);
+    expect(Q.upcoming(q)).toEqual([]);
+    expect(Q.history(q)).toEqual(['a', 'b']);
+    expect(Q.afterCurrent(q)).toEqual({ kind: 'stop' });
+  });
+
+  it('repeat-one: the current song repeats and is not listed as upcoming', () => {
+    const q = at(['a', 'b'], 0, 'one');
+    expect(Q.upcoming(q)).toEqual(['b']); // b is still queued, just not next while repeating one
+    expect(Q.afterCurrent(q)).toEqual({ kind: 'repeat-one' });
+    const single = at(['a'], 0, 'one');
+    expect(Q.upcoming(single)).toEqual([]);
+    expect(Q.afterCurrent(single)).toEqual({ kind: 'repeat-one' });
+  });
+
+  it('repeat-all: wraps to the first entry without listing the current song as upcoming', () => {
+    const multi = at(['a', 'b', 'c'], 2, 'all');
+    expect(Q.upcoming(multi)).toEqual([]);
+    expect(Q.afterCurrent(multi)).toEqual({ kind: 'wrap', id: 'a', same: false });
+    const single = at(['a'], 0, 'all');
+    expect(Q.upcoming(single)).toEqual([]); // the song repeating is not "up next"
+    expect(Q.afterCurrent(single)).toEqual({ kind: 'wrap', id: 'a', same: true });
+    expect(Q.afterCurrent(at(['a', 'b'], 0, 'all'))).toEqual({ kind: 'next', id: 'b' });
+  });
+
+  it('the same song queued again is upcoming, as its own entry', () => {
+    let q = at(['a', 'b'], 0);
+    q = Q.addToEnd(q, ['a']);
+    expect(Q.upcoming(q)).toEqual(['b', 'a']);
+    expect(Q.currentId(q)).toBe('a');
+    q = Q.playNext(at(['a'], 0), ['a']);
+    expect(Q.upcoming(q)).toEqual(['a']);
+  });
+
+  it('shuffle keeps the current song first and never repeats it in upcoming', () => {
+    const q = Q.setShuffle(at(['a', 'b', 'c', 'd', 'e'], 2), true, () => 0);
+    expect(Q.currentId(q)).toBe('c');
+    expect(Q.upcoming(q)).toHaveLength(4);
+    expect(Q.upcoming(q)).not.toContain('c');
+  });
+
+  it('an empty queue has nothing to show', () => {
+    const q = Q.emptyQueue();
+    expect(Q.upcoming(q)).toEqual([]);
+    expect(Q.history(q)).toEqual([]);
+    expect(Q.afterCurrent(q)).toEqual({ kind: 'stop' });
+  });
+
+  it('selectors agree with what next() actually does', () => {
+    for (const repeat of ['off', 'all', 'one'] as const) for (const len of [1, 2, 3]) for (let i = 0; i < len; i++) {
+      const q = at(Array.from({ length: len }, (_, k) => 'abc'[k]), i, repeat);
+      const a = Q.afterCurrent(q), n = Q.next(q, true);
+      if (a.kind === 'stop') expect(n.ended).toBe(true);
+      else if (a.kind === 'repeat-one') expect(n.state.index).toBe(q.index);
+      else expect(Q.currentId(n.state)).toBe(a.id);
+    }
+  });
+});
+

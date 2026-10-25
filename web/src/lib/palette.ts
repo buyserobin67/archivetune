@@ -1,4 +1,5 @@
 import { db as defaultDb, type CadenceDB } from './db';
+import { getArtBlob } from './artSource';
 
 export type RGB = [number, number, number];
 
@@ -118,9 +119,9 @@ async function decode(blob: Blob): Promise<Uint8ClampedArray | null> {
 export function getArtPalette(trackId: string, d: CadenceDB = defaultDb): Promise<Palette | null> {
   let p = cache.get(trackId);
   if (!p) {
-    p = d.art.get(trackId).then(async (row) => {
-      if (!row) return null;
-      const px = await decode(row.blob);
+    p = getArtBlob(trackId, d).then(async (blob) => {
+      if (!blob) return null;
+      const px = await decode(blob);
       return px ? paletteFromPixels(px) : null;
     }).catch(() => null);
     cache.set(trackId, p);
@@ -134,9 +135,9 @@ const thumbs = new Map<string, Promise<string | null>>();
 export function getArtThumb(trackId: string, d: CadenceDB = defaultDb): Promise<string | null> {
   let p = thumbs.get(trackId);
   if (!p) {
-    p = d.art.get(trackId).then(async (row) => {
-      if (!row) return null;
-      const bmp = await createImageBitmap(row.blob);
+    p = getArtBlob(trackId, d).then(async (blob) => {
+      if (!blob) return null;
+      const bmp = await createImageBitmap(blob);
       const c = document.createElement('canvas');
       c.width = c.height = 16;
       c.getContext('2d')?.drawImage(bmp, 0, 0, 16, 16);
@@ -146,4 +147,10 @@ export function getArtThumb(trackId: string, d: CadenceDB = defaultDb): Promise<
     thumbs.set(trackId, p);
   }
   return p;
+}
+
+/** Drops cached colours and the tiny backdrop thumbnail for a track (after its artwork changed). */
+export function forgetArtColours(trackId: string): void {
+  cache.delete(trackId);
+  thumbs.delete(trackId);
 }

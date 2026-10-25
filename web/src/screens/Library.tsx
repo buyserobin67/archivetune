@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Art } from '../components/Art';
 import { GroupGrid } from '../components/Cards';
 import { DownloadIcon, PlayIcon, PlusIcon, ShuffleIcon, SortIcon, HeartIcon } from '../components/Icons';
 import { ImportButton } from '../components/ImportButton';
 import { LicensedDownloads } from '../components/LicensedDownloads';
-import { OptionSheet, Sheet } from '../components/Sheets';
+import { Sheet, SheetItem } from '../components/Sheets';
 import { TrackRow } from '../components/TrackRow';
 import { groupAlbums, groupArtists, matchesQuery } from '../lib/library';
 import { getPlayer } from '../lib/player';
@@ -14,18 +14,19 @@ import { usePlaylists, usePref, useTracks } from '../lib/hooks';
 import { filterTracks, GROUP_SORTS, SONG_SORTS, sortGroups, sortTracks, type GroupSort, type SongSort } from '../lib/sort';
 import { ui } from '../lib/ui';
 import type { Track } from '../lib/types';
-import { Chip, EmptyState, RoundButton, ScreenHeader, SearchField } from './common';
+import { EmptyState, ScreenHeader, SearchField } from './common';
 
 const TABS = [['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists'], ['playlists', 'Playlists'], ['downloads', 'Downloads']] as const;
 const VALID = new Set<string>([...TABS.map(([k]) => k), 'favorites']);
 
 export default function Library() {
   const { tab = 'songs' } = useParams();
+  const nav = useNavigate();
   const tracks = useTracks();
   const [query, setQuery] = useState('');
   const [songSort, setSongSort] = usePref<SongSort>('songSort', 'title');
   const [groupSort, setGroupSort] = usePref<GroupSort>('groupSort', 'name');
-  const [sheet, setSheet] = useState<'sort' | 'add' | null>(null);
+  const [sheet, setSheet] = useState<'menu' | 'add' | null>(null);
   const p = getPlayer();
 
   const favoritesOnly = tab === 'favorites';
@@ -41,38 +42,53 @@ export default function Library() {
   if (!tracks) return <ScreenHeader title="Library" />;
 
   const isSongs = tab === 'songs' || tab === 'favorites' || tab === 'downloads';
+  const isSongsTab = tab === 'songs' || tab === 'favorites';
   const list = tab === 'downloads' ? downloads : songs;
   const ids = list.map((t) => t.id);
-  const sortLabel = isSongs ? SONG_SORTS.find(([k]) => k === songSort)![1] : GROUP_SORTS.find(([k]) => k === groupSort)![1];
   const shown = tab === 'albums' ? albums.length : tab === 'artists' ? artists.length : list.length;
   const unit = tab === 'albums' ? 'album' : tab === 'artists' ? 'artist' : 'song';
+  const filtered = (isSongs ? songSort !== 'title' : groupSort !== 'name') || favoritesOnly;
 
   return (
     <div className="page-enter">
-      <ScreenHeader title="Library" eyebrow={tracks.length ? `${shown} ${unit}${shown === 1 ? '' : 's'}` : undefined} actions={<ImportButton variant="icon" label="Import music" />} />
+      <ScreenHeader title="Library" actions={<ImportButton variant="icon" label="Import music" />} />
 
-      {tab !== 'playlists' && <div className="px-gutter pb-3"><SearchField value={query} onChange={setQuery} placeholder={`Search ${tab === 'favorites' ? 'favorites' : tab}`} /></div>}
+      {tab !== 'playlists' && (
+        <div className="flex items-center gap-2 px-gutter pb-3">
+          <div className="min-w-0 flex-1"><SearchField value={query} onChange={setQuery} placeholder={`Search ${tab === 'favorites' ? 'favorites' : tab}`} /></div>
+          {tracks.length > 0 && (
+            <button className="press relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-s2 ring-1 ring-line" onClick={() => setSheet('menu')} aria-label="Sort and filter">
+              <SortIcon size={18} />
+              {filtered && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-art-text ring-2 ring-s2" aria-hidden="true" />}
+            </button>
+          )}
+        </div>
+      )}
 
-      <div className="row-scroll hide-scroll gap-2 px-gutter pb-3" role="tablist" aria-label="Library sections">
-        {TABS.map(([k, label]) => <Chip key={k} to={`/library/${k}`} active={tab === k || (k === 'songs' && tab === 'favorites')}>{label}</Chip>)}
-      </div>
+      {/* One compact row of categories: text tabs with an underline, no boxes. */}
+      <nav className="row-scroll hide-scroll gap-5 px-gutter pb-1" aria-label="Library sections">
+        {TABS.map(([k, label]) => {
+          const on = tab === k || (k === 'songs' && tab === 'favorites');
+          return (
+            <Link key={k} to={`/library/${k}`} aria-current={on ? 'page' : undefined}
+              className={`press relative shrink-0 py-2 text-body font-semibold ${on ? 'text-fg' : 'text-fg-3'}`}>
+              {label}
+              {on && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-fg" aria-hidden="true" />}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mb-2 h-px bg-line" />
 
       {tab !== 'playlists' && tracks.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-gutter pb-2">
-          <Chip onClick={() => setSheet('sort')} label={`Sort by ${sortLabel}`}><SortIcon size={15} />{sortLabel}</Chip>
-          {(tab === 'songs' || tab === 'favorites') && (
-            <Link to={favoritesOnly ? '/library/songs' : '/library/favorites'} replace className={`press inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-footnote font-semibold ${favoritesOnly ? 'bg-accent text-black' : 'bg-s2 text-fg-2 ring-1 ring-line'}`} aria-pressed={favoritesOnly}>
-              <HeartIcon size={14} filled={favoritesOnly} />Favorites
-            </Link>
+        <div className="flex items-center justify-between px-gutter pb-1 pt-1">
+          <span className="text-caption text-fg-3">{shown} {unit}{shown === 1 ? '' : 's'}{favoritesOnly ? ' · favorites' : ''}</span>
+          {isSongs && ids.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <button className="press flex h-8 items-center gap-1 rounded-full bg-fg px-3 text-caption font-semibold text-black" aria-label="Play" onClick={() => void p.playQueue(ids, 0)}><PlayIcon size={12} />Play</button>
+              <button className="press flex h-8 w-8 items-center justify-center rounded-full bg-s2 ring-1 ring-line" aria-label="Shuffle" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); }}><ShuffleIcon size={14} /></button>
+            </div>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            {isSongs && ids.length > 0 && (
-              <>
-                <RoundButton label="Play" tone="accent" onClick={() => void p.playQueue(ids, 0)}><PlayIcon size={18} /></RoundButton>
-                <RoundButton label="Shuffle" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); }}><ShuffleIcon size={18} /></RoundButton>
-              </>
-            )}
-          </div>
         </div>
       )}
 
@@ -86,9 +102,22 @@ export default function Library() {
         albums.length ? <GroupGrid groups={albums} base="/library/albums" /> : <NoMatches query={query} />
       ) : artists.length ? <GroupGrid groups={artists} base="/library/artists" round /> : <NoMatches query={query} />}
 
-      {sheet === 'sort' && (isSongs
-        ? <OptionSheet title="Sort by" options={SONG_SORTS} value={songSort} onPick={setSongSort} onClose={() => setSheet(null)} />
-        : <OptionSheet title="Sort by" options={GROUP_SORTS} value={groupSort} onPick={setGroupSort} onClose={() => setSheet(null)} />)}
+      {sheet === 'menu' && (
+        <Sheet title="Sort & filter" onClose={() => setSheet(null)}>
+          <h3 className="eyebrow px-1 pb-1 pt-1">Sort by</h3>
+          {(isSongs ? SONG_SORTS : GROUP_SORTS).map(([k, label]) => (
+            <SheetItem key={k} label={label} selected={isSongs ? k === songSort : k === groupSort}
+              onClick={() => (isSongs ? setSongSort(k as SongSort) : setGroupSort(k as GroupSort))} />
+          ))}
+          {isSongsTab && (
+            <>
+              <h3 className="eyebrow px-1 pb-1 pt-3">Filter</h3>
+              <SheetItem icon={<HeartIcon size={20} filled={favoritesOnly} />} label="Favorites only" selected={favoritesOnly}
+                onClick={() => { nav(favoritesOnly ? '/library/songs' : '/library/favorites', { replace: true }); setSheet(null); }} />
+            </>
+          )}
+        </Sheet>
+      )}
       {sheet === 'add' && <Sheet title="Add licensed music" tall onClose={() => setSheet(null)}><LicensedDownloads /></Sheet>}
     </div>
   );
