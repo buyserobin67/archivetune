@@ -2,7 +2,7 @@ name: Cadence Web (build, test, deploy to GitHub Pages)
 
 on:
   push:
-    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, claude/cadence-web-features, main]
+    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, claude/cadence-web-features, claude/cadence-web-standalone-fix, main]
     paths: ["web/**", ".github/workflows/web-pages.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web-pages.yml"]
@@ -57,6 +57,12 @@ jobs:
 
       - name: Browser E2E
         run: npm run e2e
+        env:
+          E2E_BASE: /${{ github.event.repository.name }}/
+
+      # Home Screen app with a viewport shorter than the screen: no empty band under the tab bar (emulated numbers).
+      - name: Fill-screen in the Home Screen app
+        run: npm run e2e:fill
         env:
           E2E_BASE: /${{ github.event.repository.name }}/
 

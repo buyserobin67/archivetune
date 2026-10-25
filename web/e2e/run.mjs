@@ -396,6 +396,7 @@ async function run() {
       check(await page.getByText('Seeded Star').first().isVisible(), 'recap shows the top artist for the period');
       check(await page.locator('[data-testid="recap-bars"] > div').count() === 7, 'week view has seven bars');
       await noOverflow(page, '#main', 'recap');
+      check(await page.locator('[data-testid="stats-saver"]').isVisible() && /Save stats file/.test(await page.locator('[data-testid="stats-saver"]').innerText()), 'recap offers a stats file that survives deleting the app');
       await page.getByRole('tab', { name: 'Day' }).click();
       check(await page.locator('[data-testid="recap-bars"] > div').count() === 24, 'day view has 24 hourly bars');
       await page.getByRole('tab', { name: 'Year' }).click();

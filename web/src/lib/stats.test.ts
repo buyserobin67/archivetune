@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearListeningHistory, computeRecap, countThreshold, currentStreak, formatListening, ListenTracker, rangeFor } from './stats';
+import { clearListeningHistory, computeRecap, countThreshold, currentStreak, exportStats, formatListening, importStats, ListenTracker, rangeFor, statsSaveStatus } from './stats';
 import { makeDb } from './../test/helpers';
 import type { PlayEvent } from './types';
 
@@ -105,7 +105,7 @@ describe('recap', () => {
     const r = computeRecap(events, 'day', now);
     expect(r.plays).toBe(3);
     expect(r.seconds).toBe(540);
-    expect(r.topTracks.map((t) => t.key)).toEqual(['c']);
+    expect(r.topTracks.map((t) => t.name)).toEqual(['c']);
     expect(r.topArtists[0]).toMatchObject({ name: 'Ember', plays: 3 });
     expect(r.bars).toHaveLength(24);
     expect(r.bars[22].plays).toBe(1);
@@ -157,5 +157,45 @@ describe('listening history storage', () => {
     await clearListeningHistory(db);
     expect(await db.plays.count()).toBe(0);
     expect(await db.tracks.count()).toBe(1);
+  });
+});
+
+describe('stats file survives deleting the Home Screen app', () => {
+  it('restores minutes, plays and streak into an empty app, matching songs by name after the music is re-imported', async () => {
+    const old = makeDb();
+    const day = 86_400_000, now = Date.now();
+    await old.plays.bulkAdd([0, 1, 2].map((i) => ev(`old-${i}`, now - i * day, 200, 'Nova Vale', 'Tide Study', 'Afterglow')));
+    const file = await exportStats(old, now);
+    expect((await statsSaveStatus(old)).newSince).toBe(0);
+
+    const reinstalled = makeDb(); // empty: everything was erased
+    await reinstalled.tracks.put({ id: 'new-id', hash: 'h', title: 'Tide Study', artist: 'Nova Vale', album: 'Afterglow', duration: 10, mime: 'a', size: 1, fileName: 'x', hasArt: false, favorite: 0, addedAt: 1, lastPlayedAt: 0, playCount: 0 });
+    expect(await importStats(file, reinstalled)).toEqual({ added: 3, skipped: 0 });
+    const all = await reinstalled.plays.toArray();
+    expect(all.every((e) => e.trackId === 'new-id')).toBe(true);
+    expect(currentStreak(all, now)).toBe(3);
+    const r = computeRecap(all, 'week', now);
+    expect(r.seconds).toBeGreaterThan(0);
+    expect(computeRecap(all, 'year', now).seconds).toBe(600);
+    // importing twice adds nothing
+    expect(await importStats(file, reinstalled)).toEqual({ added: 0, skipped: 3 });
+  });
+
+  it('keeps history even if the music is not re-imported yet, and rejects other files', async () => {
+    const old = makeDb();
+    await old.plays.add(ev('x', 5, 100, 'A', 'Song'));
+    const fresh = makeDb();
+    await importStats(await exportStats(old), fresh);
+    expect((await fresh.plays.toArray())[0]).toMatchObject({ title: 'Song', trackId: 'restored:Song' });
+    await expect(importStats(new Blob(['{"hello":1}']), fresh)).rejects.toThrow('not a Cadence stats file');
+    await expect(importStats(new Blob(['not json']), fresh)).rejects.toThrow('not a Cadence stats file');
+  });
+
+  it('counts listens since the last saved copy', async () => {
+    const d = makeDb();
+    await d.plays.add(ev('x', 1));
+    await exportStats(d);
+    await d.plays.bulkAdd([ev('y', 2), ev('z', 3)]);
+    expect(await statsSaveStatus(d)).toMatchObject({ newSince: 2 });
   });
 });

@@ -142,10 +142,10 @@ export function computeRecap(all: PlayEvent[], period: Period, anchor = Date.now
     range,
     plays: ev.length,
     seconds: ev.reduce((s, e) => s + e.seconds, 0),
-    uniqueTracks: new Set(ev.map((e) => e.trackId)).size,
+    uniqueTracks: new Set(ev.map((e) => `${e.title}\u0000${e.artist}`)).size,
     uniqueArtists: new Set(ev.map((e) => e.artist)).size,
     activeDays: new Set(ev.map((e) => startOfDay(new Date(e.at)).getTime())).size,
-    topTracks: rank(ev, (e) => e.trackId, (e) => e.title, (e) => e.artist),
+    topTracks: rank(ev, (e) => `${e.title}\u0000${e.artist}`, (e) => e.title, (e) => e.artist),
     topArtists: rank(ev, (e) => e.artist, (e) => e.artist),
     topAlbums: rank(ev, (e) => `${e.album}\u0000${e.artist}`, (e) => e.album, (e) => e.artist),
     bars,
@@ -174,4 +174,48 @@ export function currentStreak(all: PlayEvent[], now = Date.now()): number {
 
 export async function clearListeningHistory(d: CadenceDB = defaultDb): Promise<void> {
   await d.plays.clear();
+}
+
+// ---- stats file: a tiny copy of the listening history you can keep in Files ----
+// Deleting the Home Screen icon erases everything the app stored, including this history. A saved file survives that.
+
+const STATS_FORMAT = 'cadence-stats';
+const LAST_SAVED_KEY = 'statsSavedAt';
+const SAVED_COUNT_KEY = 'statsSavedCount';
+
+export interface StatsFile { format: typeof STATS_FORMAT; version: 1; exportedAt: number; plays: Omit<PlayEvent, 'id' | 'trackId'>[] }
+
+export async function exportStats(d: CadenceDB = defaultDb, now = Date.now()): Promise<Blob> {
+  const plays = (await d.plays.orderBy('at').toArray()).map(({ at, seconds, title, artist, album }) => ({ at, seconds, title, artist, album }));
+  const file: StatsFile = { format: STATS_FORMAT, version: 1, exportedAt: now, plays };
+  await d.settings.bulkPut([{ key: LAST_SAVED_KEY, value: now }, { key: SAVED_COUNT_KEY, value: plays.length }]);
+  return new Blob([JSON.stringify(file)], { type: 'application/json' });
+}
+
+/** Merges a stats file into the history. Songs are matched by title and artist, so it works after re-importing your music. Returns how many listens were new. */
+export async function importStats(file: Blob, d: CadenceDB = defaultDb): Promise<{ added: number; skipped: number }> {
+  let data: StatsFile;
+  try { data = JSON.parse(await file.text()) as StatsFile; } catch { throw new Error('That is not a Cadence stats file.'); }
+  if (data?.format !== STATS_FORMAT || !Array.isArray(data.plays)) throw new Error('That is not a Cadence stats file.');
+  const have = new Set((await d.plays.toArray()).map((e) => `${e.title}|${e.artist}|${e.at}`));
+  const tracks = await d.tracks.toArray();
+  const idFor = new Map(tracks.map((t) => [`${t.title}\u0000${t.artist}`, t.id]));
+  const fresh: PlayEvent[] = [];
+  for (const p of data.plays) {
+    if (typeof p.at !== 'number' || typeof p.seconds !== 'number' || !p.title) continue;
+    const key = `${p.title}|${p.artist}|${p.at}`;
+    if (have.has(key)) continue;
+    have.add(key);
+    fresh.push({ trackId: idFor.get(`${p.title}\u0000${p.artist}`) ?? `restored:${p.title}`, at: p.at, seconds: p.seconds, title: p.title, artist: p.artist ?? '', album: p.album ?? '' });
+  }
+  if (fresh.length) await d.plays.bulkAdd(fresh);
+  return { added: fresh.length, skipped: data.plays.length - fresh.length };
+}
+
+export interface SaveStatus { savedAt: number | null; newSince: number }
+/** When the stats file was last saved and how many listens happened since. */
+export async function statsSaveStatus(d: CadenceDB = defaultDb): Promise<SaveStatus> {
+  const savedAt = (await d.settings.get(LAST_SAVED_KEY))?.value as number | undefined;
+  const count = ((await d.settings.get(SAVED_COUNT_KEY))?.value as number | undefined) ?? 0;
+  return { savedAt: savedAt ?? null, newSince: Math.max(0, (await d.plays.count()) - count) };
 }

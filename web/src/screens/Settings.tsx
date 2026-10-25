@@ -11,6 +11,7 @@ import { ImportButton } from '../components/ImportButton';
 import { ChevronRight } from '../components/Icons';
 import { clearListeningHistory } from '../lib/stats';
 import { ART_ACCENT_KEY, artAccentOn, refreshAccent } from '../lib/accent';
+import { StatsSaver } from '../components/StatsSaver';
 import { AboutData } from '../components/AboutData';
 import { DisplayDiagnostics } from '../components/DisplayDiagnostics';
 import { ArtworkDiagnostics } from '../components/ArtworkDiagnostics';
@@ -102,7 +103,8 @@ export default function Settings() {
       </Group>
 
       <Group title="Listening recap" footer="Your day, week, month and year recaps are built from a small log kept only on this device. It is included in backups.">
-        <Link to="/recap" className="press flex items-center justify-between text-body font-medium">View recap <ChevronRight size={18} className="text-fg-3" /></Link>
+        <Link to="/recap" className="press mb-4 flex items-center justify-between text-body font-medium">View recap <ChevronRight size={18} className="text-fg-3" /></Link>
+        <StatsSaver compact />
         <button className={`${btn} mt-4`} onClick={() => { if (confirm('Clear your listening history? Songs and playlists are not affected.')) void run('clear-history', async () => { await clearListeningHistory(); return 'Listening history cleared'; }); }}>Clear listening history</button>
       </Group>
 

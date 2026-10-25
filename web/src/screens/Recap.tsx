@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Art } from '../components/Art';
 import { ChevronLeft, ChevronRight } from '../components/Icons';
+import { StatsSaver } from '../components/StatsSaver';
 import { db } from '../lib/db';
 import { getPlayer } from '../lib/player';
 import { computeRecap, currentStreak, formatListening, rangeFor, type Period, type Ranked } from '../lib/stats';
@@ -30,7 +31,7 @@ function RankList({ title, rows, kind }: { title: string; rows: Ranked[]; kind: 
           <li key={r.key}>
             <button
               className="press flex w-full items-center gap-3 rounded-lg py-1.5 text-left"
-              onClick={() => { void db.tracks.get(r.trackId).then((t) => { if (t) void getPlayer().playQueue([t.id], 0); }); }}
+              onClick={() => { void db.tracks.toArray().then((all) => { const t = all.find((x) => x.id === r.trackId) ?? all.find((x) => x.title === r.name && (kind !== 'track' || x.artist === r.sub)); if (t) void getPlayer().playQueue([t.id], 0); }); }}
             >
               <span className="w-5 shrink-0 text-center text-footnote font-semibold tabular-nums text-fg-3">{i + 1}</span>
               <Art trackId={r.trackId} seed={r.name} className="h-12 w-12" rounded={kind === 'artist' ? 'rounded-full' : 'rounded-md'} />
@@ -119,6 +120,7 @@ export default function Recap() {
           </div>
         </>
       )}
+      <div className="mx-gutter mb-3"><StatsSaver /></div>
       <p className="px-gutter text-center text-caption text-fg-3">Counted after 30 seconds of a song. Never uploaded. Clear it in Settings.</p>
     </div>
   );
