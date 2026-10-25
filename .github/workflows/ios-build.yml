@@ -6,7 +6,9 @@ name: iOS build & test
 on:
   push:
     branches: ["**"]
+    paths-ignore: ["web/**", ".github/workflows/web-pages.yml", "docs/WEB_*.md"]
   pull_request:
+    paths-ignore: ["web/**", ".github/workflows/web-pages.yml", "docs/WEB_*.md"]
   workflow_dispatch:
 
 concurrency:

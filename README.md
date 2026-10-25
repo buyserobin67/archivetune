@@ -1,5 +1,7 @@
 # Cadence
 
+> **Web version:** a Home Screen PWA lives in [`web/`](web/) and needs no Mac or developer account. See [docs/WEB_INSTALL.md](docs/WEB_INSTALL.md).
+
 A dark, offline-first music player for iPhone. Import audio from the Files app, and it plays
 from inside the app: library, queue, lock-screen controls, and background audio. No accounts,
 no analytics, no network access.

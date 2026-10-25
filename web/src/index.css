@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: #000;
+  color: #f5f3ff;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+input, textarea { -webkit-user-select: text; user-select: text; }
+* { -webkit-user-select: none; user-select: none; }
+
+.pt-safe { padding-top: calc(var(--sat) + 0.75rem); }
+.pb-safe { padding-bottom: var(--sab); }
+.px-safe { padding-left: max(var(--sal), 1rem); padding-right: max(var(--sar), 1rem); }
+
+.scroll-y { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.hide-scroll::-webkit-scrollbar { display: none; }
+
+.glass { background: rgba(15, 11, 24, 0.72); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4); }
+.violet-glow { background: radial-gradient(120% 80% at 50% 0%, rgba(124, 58, 237, 0.28), rgba(0,0,0,0) 60%); }
+.press { transition: transform .12s ease, opacity .12s ease; }
+.press:active { transform: scale(.96); opacity: .85; }
+
+input[type='range'].seek { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; width: 100%; }
+input[type='range'].seek::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, #a78bfa var(--p, 0%), rgba(255,255,255,.18) var(--p, 0%)); }
+input[type='range'].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.5); }
+input[type='range'].seek::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255,255,255,.18); }
+input[type='range'].seek::-moz-range-progress { height: 4px; border-radius: 4px; background: #a78bfa; }
+input[type='range'].seek::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
