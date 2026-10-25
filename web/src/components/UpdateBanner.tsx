@@ -9,7 +9,7 @@ export function UpdateBanner() {
   if (!u.ready || later) return null;
   return (
     <div role="status" aria-live="polite" className="absolute inset-x-0 top-0 z-[55] animate-enter px-3" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)' }}>
-      <div className="mx-auto flex max-w-md items-center gap-3 rounded-xl bg-s3 p-3 shadow-float ring-1 ring-white/10">
+      <div className="mx-auto flex max-w-md items-center gap-3 rounded-xl bg-s3 p-3 shadow-float">
         <p className="min-w-0 flex-1 text-footnote text-fg">
           <b>New Cadence version available</b> — Restart to update.
           <span className="mt-0.5 block text-caption text-fg-3">Your music and playlists stay on this device.</span>

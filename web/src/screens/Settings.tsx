@@ -9,6 +9,8 @@ import { useStorageStatus, useTracks } from '../lib/hooks';
 import { ui } from '../lib/ui';
 import { ImportButton } from '../components/ImportButton';
 import { ChevronRight } from '../components/Icons';
+import { clearListeningHistory } from '../lib/stats';
+import { ART_ACCENT_KEY, artAccentOn, refreshAccent } from '../lib/accent';
 import { AboutData } from '../components/AboutData';
 import { DisplayDiagnostics } from '../components/DisplayDiagnostics';
 import { ArtworkDiagnostics } from '../components/ArtworkDiagnostics';
@@ -18,7 +20,7 @@ function Group({ title, footer, children }: { title: string; footer?: React.Reac
   return (
     <section className="mb-6 px-gutter">
       <h2 className="eyebrow mb-2 pl-1">{title}</h2>
-      <div className="overflow-hidden rounded-lg bg-s1 p-4 ring-1 ring-line">{children}</div>
+      <div className="overflow-hidden rounded-lg bg-s1 p-4">{children}</div>
       {footer && <p className="mt-2 px-1 text-caption text-fg-3">{footer}</p>}
     </section>
   );
@@ -88,6 +90,20 @@ export default function Settings() {
         <Link to="/library/downloads" className="press mt-4 flex items-center justify-between text-body font-medium">
           Licensed downloads <ChevronRight size={18} className="text-fg-3" />
         </Link>
+      </Group>
+
+      <Group title="Appearance" footer="Off keeps the calm white accent. On, buttons and highlights take a light tone from the current cover.">
+        <label className="flex items-center justify-between gap-4 text-body font-medium">
+          Accent from artwork
+          <input type="checkbox" role="switch" className="h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-s3 transition-colors checked:bg-fg [&::before]:block [&::before]:h-5 [&::before]:w-5 [&::before]:translate-x-0.5 [&::before]:translate-y-0.5 [&::before]:rounded-full [&::before]:bg-white [&::before]:transition-transform checked:[&::before]:translate-x-[1.375rem] checked:[&::before]:bg-black"
+            defaultChecked={artAccentOn()} aria-label="Accent from artwork"
+            onChange={(e) => { try { localStorage.setItem(ART_ACCENT_KEY, String(e.target.checked)); } catch { /* ignore */ } refreshAccent(); }} />
+        </label>
+      </Group>
+
+      <Group title="Listening recap" footer="Your day, week, month and year recaps are built from a small log kept only on this device. It is included in backups.">
+        <Link to="/recap" className="press flex items-center justify-between text-body font-medium">View recap <ChevronRight size={18} className="text-fg-3" /></Link>
+        <button className={`${btn} mt-4`} onClick={() => { if (confirm('Clear your listening history? Songs and playlists are not affected.')) void run('clear-history', async () => { await clearListeningHistory(); return 'Listening history cleared'; }); }}>Clear listening history</button>
       </Group>
 
       <Group title="Backup & restore" footer="A full backup includes your audio and can be large. Save it to the Files app.">

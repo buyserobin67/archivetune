@@ -373,6 +373,45 @@ async function run() {
       await page.click(`${P} [aria-label="Close player"]`);
       await page.waitForTimeout(700);
 
+      // ---- Recap (listening stats, on device) ----
+      const idbPlays = () => page.evaluate(() => new Promise((ok, no) => { const r = indexedDB.open('cadence'); r.onsuccess = () => { const db = r.result; const q = db.transaction('plays').objectStore('plays').getAll(); q.onsuccess = () => { db.close(); ok(q.result); }; q.onerror = () => no(q.error); }; r.onerror = () => no(r.error); }));
+      const realPlays = await idbPlays();
+      check(realPlays.length >= 1 && realPlays.every((e) => e.title && e.artist && e.seconds > 0), `real playback was logged as a listen (${realPlays.length} so far)`, JSON.stringify(realPlays.slice(0, 2)));
+      await page.evaluate(() => new Promise((ok, no) => {
+        const r = indexedDB.open('cadence');
+        r.onsuccess = () => {
+          const db = r.result, tx = db.transaction('plays', 'readwrite'), st = tx.objectStore('plays'), now = Date.now(), day = 86400000;
+          const mk = (ago, artist, title, album, seconds) => st.add({ trackId: 'seed-' + title, at: now - ago, seconds, title, artist, album });
+          for (let i = 0; i < 6; i++) mk(i * 3600000 + 1000, 'Seeded Star', 'Seeded Song One', 'Seed Album', 200);
+          mk(day * 2, 'Other Act', 'Seeded Song Two', 'Seed Album 2', 180);
+          mk(day * 40, 'Old Timer', 'Seeded Old Song', 'Seed Old', 150);
+          tx.oncomplete = () => { db.close(); ok(); }; tx.onerror = () => no(tx.error);
+        };
+      }));
+      await page.goto(`${URL}#/recap`);
+      await page.waitForSelector('[data-testid="recap-time"]', { timeout: 8000 });
+      await page.waitForTimeout(500);
+      await shot(page, '9b-recap');
+      check(await page.getByRole('tab').count() === 4, 'recap has Day / Week / Month / Year');
+      check(await page.getByText('Seeded Star').first().isVisible(), 'recap shows the top artist for the period');
+      check(await page.locator('[data-testid="recap-bars"] > div').count() === 7, 'week view has seven bars');
+      await noOverflow(page, '#main', 'recap');
+      await page.getByRole('tab', { name: 'Day' }).click();
+      check(await page.locator('[data-testid="recap-bars"] > div').count() === 24, 'day view has 24 hourly bars');
+      await page.getByRole('tab', { name: 'Year' }).click();
+      check(await page.locator('[data-testid="recap-bars"] > div').count() === 12, 'year view has 12 monthly bars');
+      const nextDisabled = await page.locator('[aria-label="Next year"]').isDisabled();
+      check(nextDisabled, 'cannot navigate into the future');
+      await page.click('[aria-label="Previous year"]');
+      await page.waitForTimeout(300);
+      check(await page.locator('[data-testid="recap-empty"]').count() === 1 || await page.locator('[data-testid="recap-label"]').innerText().then((t) => /\d{4}/.test(t)), 'previous year loads (empty or with data) without errors');
+      await page.getByRole('tab', { name: 'Month' }).click();
+      await page.waitForTimeout(300);
+      await noOverflow(page, '#main', 'recap month');
+      await page.goto(`${URL}#/`);
+      await page.waitForTimeout(400);
+      check(await page.locator('[aria-label="Open your listening recap"]').isVisible(), 'Home links to the recap');
+
       // ---- artwork: square, landscape, pillarboxed, letterboxed (flat bars) and transparent-bar covers ----
       if (vp.name === 'iphone-390x844' || vp.name === 'standalone-402x874') {
         const BG = [36, 38, 41]; // --surface-2: the card colour that shows through transparent pixels

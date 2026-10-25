@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { APP_BUILD, APP_VERSION } from './appInfo';
-import type { ArtEdit, Lyrics, Playlist, Setting, Track, TrackArt, TrackBlob } from './types';
+import type { ArtEdit, Lyrics, PlayEvent, Playlist, Setting, Track, TrackArt, TrackBlob } from './types';
 
 /**
  * DATA SAFETY CONTRACT
@@ -18,7 +18,7 @@ import type { ArtEdit, Lyrics, Playlist, Setting, Track, TrackArt, TrackBlob } f
  * Forbidden anywhere in the app (enforced by src/lib/dataSafety.test.ts): deleteDatabase, Dexie.delete, db.delete,
  * clearing library tables, localStorage.clear, unregistering service workers.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export class CadenceDB extends Dexie {
   tracks!: Table<Track, string>;
@@ -28,6 +28,7 @@ export class CadenceDB extends Dexie {
   settings!: Table<Setting, string>;
   lyrics!: Table<Lyrics, string>;
   artEdits!: Table<ArtEdit, string>;
+  plays!: Table<PlayEvent, number>;
 
   constructor(name = 'cadence') {
     super(name);
@@ -43,6 +44,8 @@ export class CadenceDB extends Dexie {
     this.version(2).stores({ lyrics: 'trackId' });
     // v3 only adds a table for non-destructive artwork trims; the original images in `art` are never modified.
     this.version(3).stores({ artEdits: 'trackId' });
+    // v4 only adds the on-device listening log behind the recap. Nothing existing changes.
+    this.version(4).stores({ plays: '++id, at, trackId' });
   }
 }
 

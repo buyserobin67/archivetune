@@ -95,7 +95,7 @@ export function ArtworkDiagnostics() {
   return (
     <section className="mb-6 px-gutter" aria-labelledby="art-title">
       <h2 id="art-title" className="eyebrow mb-2 pl-1">Artwork</h2>
-      <div className="overflow-hidden rounded-lg bg-s1 p-4 ring-1 ring-line">
+      <div className="overflow-hidden rounded-lg bg-s1 p-4">
         <p className="text-footnote text-fg-2">
           Some embedded covers have transparent or flat borders baked into the image. Those show as bars no matter how the app draws them.
           Trimming makes a separate copy; the original image inside your file is never changed, and you can undo.

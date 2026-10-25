@@ -19,8 +19,19 @@ export function useTrackPalette(track: Track | null): Palette {
   return palette;
 }
 
+let lastPalette: Palette | null = null;
+export const ART_ACCENT_KEY = 'cadence.artAccent';
+export const artAccentOn = () => { try { return localStorage.getItem(ART_ACCENT_KEY) === 'true'; } catch { return false; } };
+
+/** Re-applies the current palette after the "Accent from artwork" switch changes. */
+export function refreshAccent(): void { if (lastPalette) applyAccent(lastPalette); else applyAccent(DEFAULT_PALETTE); }
+
 export function applyAccent(p: Palette, el: HTMLElement = document.documentElement): void {
-  // Artwork colours only feed the --art* variables; the primary accent stays white.
+  lastPalette = p;
+  // Default: the primary accent stays plain white and artwork colours only tint. With the switch on, the accent is the cover's light tone.
+  const on = artAccentOn();
+  el.style.setProperty('--accent-rgb', on ? rgbCss(p.accentText) : '255 255 255');
+  el.style.setProperty('--accent-text-rgb', on ? rgbCss(p.accentText) : '245 245 245');
   el.style.setProperty('--art-rgb', rgbCss(p.accent));
   el.style.setProperty('--art2-rgb', rgbCss(p.accent2));
   el.style.setProperty('--art-text-rgb', rgbCss(p.accentText));

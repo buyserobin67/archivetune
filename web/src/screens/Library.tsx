@@ -14,6 +14,7 @@ import { usePlaylists, usePref, useTracks } from '../lib/hooks';
 import { filterTracks, GROUP_SORTS, SONG_SORTS, sortGroups, sortTracks, type GroupSort, type SongSort } from '../lib/sort';
 import { ui } from '../lib/ui';
 import type { Track } from '../lib/types';
+import { RowsSkeleton } from '../components/Skeletons';
 import { EmptyState, ScreenHeader, SearchField } from './common';
 
 const TABS = [['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists'], ['playlists', 'Playlists'], ['downloads', 'Downloads']] as const;
@@ -39,7 +40,7 @@ export default function Library() {
   const artists = useMemo(() => sortGroups(groupArtists(filterTracks(tracks ?? [], { query, favoritesOnly: false }, matchesQuery)), groupSort), [tracks, query, groupSort]);
 
   if (!VALID.has(tab)) return <Navigate to="/library/songs" replace />;
-  if (!tracks) return <ScreenHeader title="Library" />;
+  if (!tracks) return <><ScreenHeader title="Library" /><RowsSkeleton /></>;
 
   const isSongs = tab === 'songs' || tab === 'favorites' || tab === 'downloads';
   const isSongsTab = tab === 'songs' || tab === 'favorites';
@@ -57,7 +58,7 @@ export default function Library() {
         <div className="flex items-center gap-2 px-gutter pb-3">
           <div className="min-w-0 flex-1"><SearchField value={query} onChange={setQuery} placeholder={`Search ${tab === 'favorites' ? 'favorites' : tab}`} /></div>
           {tracks.length > 0 && (
-            <button className="press relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-s2 ring-1 ring-line" onClick={() => setSheet('menu')} aria-label="Sort and filter">
+            <button className="press relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-s2" onClick={() => setSheet('menu')} aria-label="Sort and filter">
               <SortIcon size={18} />
               {filtered && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-art-text ring-2 ring-s2" aria-hidden="true" />}
             </button>
@@ -86,7 +87,7 @@ export default function Library() {
           {isSongs && ids.length > 0 && (
             <div className="flex items-center gap-1.5">
               <button className="press flex h-8 items-center gap-1 rounded-full bg-fg px-3 text-caption font-semibold text-black" aria-label="Play" onClick={() => void p.playQueue(ids, 0)}><PlayIcon size={12} />Play</button>
-              <button className="press flex h-8 w-8 items-center justify-center rounded-full bg-s2 ring-1 ring-line" aria-label="Shuffle" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); }}><ShuffleIcon size={14} /></button>
+              <button className="press flex h-8 w-8 items-center justify-center rounded-full bg-s2" aria-label="Shuffle" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); }}><ShuffleIcon size={14} /></button>
             </div>
           )}
         </div>
@@ -138,7 +139,7 @@ function SongList({ list, ids, favoritesOnly, query }: { list: Track[]; ids: str
 function DownloadsTab({ list, onAdd, onPlay }: { list: Track[]; onAdd: () => void; onPlay: (i: number) => void }) {
   return (
     <>
-      <div className="mx-gutter mb-3 flex items-center gap-3 rounded-lg bg-s2 p-3 ring-1 ring-line">
+      <div className="mx-gutter mb-3 flex items-center gap-3 rounded-lg bg-s2 p-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent-text"><DownloadIcon size={20} /></div>
         <p className="min-w-0 flex-1 text-footnote text-fg-2">Music from sources that permit downloading, with license and credit kept.</p>
         <button className="press h-9 shrink-0 rounded-full bg-fg px-4 text-footnote font-semibold text-black" onClick={onAdd}>Add</button>
@@ -160,7 +161,7 @@ function PlaylistsTab() {
   return (
     <>
       <form className="mb-4 flex gap-2 px-gutter" onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) return; await createPlaylist(name); setName(''); ui.toast('Playlist created'); }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New playlist" aria-label="New playlist name" className="h-11 min-w-0 flex-1 rounded-full bg-s2 px-4 outline-none ring-1 ring-line placeholder:text-fg-3 focus:ring-2 focus:ring-accent" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New playlist" aria-label="New playlist name" className="h-11 min-w-0 flex-1 rounded-full bg-s2 px-4 outline-none placeholder:text-fg-3 focus:ring-2 focus:ring-accent" />
         <button className="press flex h-11 items-center gap-1 rounded-full bg-accent px-5 font-semibold text-black"><PlusIcon size={18} /> Add</button>
       </form>
       {!lists?.length && <p className="px-gutter py-10 text-center text-fg-3">No playlists yet.</p>}

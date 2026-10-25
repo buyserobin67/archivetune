@@ -55,7 +55,7 @@ export function Dock() {
       )}
       <MiniPlayer />
       <nav aria-label="Primary" className="px-3" style={{ paddingBottom: 'calc(var(--sab) * 0.6 + 0.5rem)' }}>
-        <ul className="mx-auto flex max-w-md rounded-[1.375rem] bg-s1 px-1 ring-1 ring-white/[0.06] shadow-float">
+        <ul className="mx-auto flex max-w-md rounded-xl bg-s1 px-1 shadow-float">
           {TABS.map(({ to, label, Icon, end, prefix }) => (
             <li key={to} className="flex-1">
               <NavLink to={to} end={end} className={({ isActive }) => {

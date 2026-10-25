@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { getArtUrl } from './art';
 import { db as defaultDb, getSetting, setSetting, type CadenceDB } from './db';
 import { markPlayed } from './library';
+import { dbListenWriters, ListenTracker } from './stats';
 import * as Q from './queue';
 import type { RepeatMode, Track } from './types';
 
@@ -62,6 +63,7 @@ export class Player {
   private pendingSeek = 0;
   private countedPlay = false;
   private consecutiveFailures = 0;
+  private tracker: ListenTracker;
   private lastPosSave = 0;
   private lastPosState = 0;
   private sleepTimer: ReturnType<typeof setTimeout> | null = null;
@@ -73,6 +75,8 @@ export class Player {
     this.makeMetadata = deps.makeMetadata ?? ((i) => (typeof MediaMetadata !== 'undefined' ? new MediaMetadata(i) : i));
     this.fallbackArt = deps.fallbackArt ?? '';
     this.audio.preload = 'auto';
+    const w = dbListenWriters(this.db);
+    this.tracker = new ListenTracker(w.write, w.update);
     this.bindAudio();
     this.bindMediaSession();
   }
@@ -110,6 +114,7 @@ export class Player {
     a.addEventListener('pause', () => {
       if ((a as HTMLAudioElement).ended) return; // handled by 'ended'
       // A pause we did not ask for (phone call, Siri, another app grabbing audio) is an interruption.
+      void this.tracker.flush();
       const interrupted = !this.userPaused && this.state.track !== null && this.loadToken > 0 && !this.state.loading;
       this.set({ isPlaying: false, interrupted });
       this.syncSession();
@@ -127,6 +132,7 @@ export class Player {
     });
     a.addEventListener('durationchange', () => this.setTime({ duration: Number.isFinite(a.duration) ? a.duration : 0 }));
     a.addEventListener('timeupdate', () => {
+      this.tracker.tick(a.currentTime, !a.paused);
       this.setTime({ currentTime: a.currentTime });
       this.updatePositionState(false);
       void this.savePosition(false);
@@ -136,6 +142,7 @@ export class Player {
   }
 
   private async onEnded() {
+    void this.tracker.flush();
     if (this.state.sleepEndOfTrack) {
       this.clearSleep();
       this.userPaused = true;
@@ -147,6 +154,7 @@ export class Player {
     }
     const { state, ended } = Q.next(this.state.queue, true);
     if (state.repeat === 'one' && !ended) {
+      this.restartTracker();
       this.audio.currentTime = 0;
       await this.safePlay();
       return;
@@ -199,6 +207,7 @@ export class Player {
     this.audio.src = this.objectUrl; // same element every time: iOS keeps the audio session alive across tracks
     if (prev) URL.revokeObjectURL(prev);
     this.set({ track });
+    this.tracker.start({ id: track.id, title: track.title, artist: track.artist, album: track.album, duration: track.duration }, resumeAt);
     this.setTime({ currentTime: 0, duration: track.duration });
     void this.updateMetadata(track);
     this.persistQueue();
@@ -211,7 +220,13 @@ export class Player {
     }
   }
 
+  private restartTracker() {
+    const t = this.state.track;
+    this.tracker.start(t ? { id: t.id, title: t.title, artist: t.artist, album: t.album, duration: t.duration } : null, 0);
+  }
+
   private unload() {
+    this.tracker.start(null);
     this.audio.pause();
     this.audio.removeAttribute('src');
     this.audio.load();

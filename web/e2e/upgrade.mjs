@@ -164,7 +164,7 @@ async function scenario(tag, distA, distB, distC, work) {
     await page.goto(ORIGIN + '/'); await sleep(2500); await page.close(); await sleep(2500);
     ({ page, errors } = await readyPage(ctx));
     const currentVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
-    const info = await loadUntil(page, (i) => i.version === currentVersion && i.schema >= 3, 'B');
+    const info = await loadUntil(page, (i) => i.version === currentVersion && i.schema >= 4, 'B');
     check(!!info, 'the new version loads on the same origin');
     if (info) {
       const after = await snapshot(page);
@@ -181,7 +181,7 @@ async function scenario(tag, distA, distB, distC, work) {
       await page.goto(ORIGIN + '/#/settings');
       await page.waitForSelector('[data-testid="about-data"]');
       const about = await page.locator('[data-testid="about-data"]').innerText();
-      check(/App version/.test(about) && /Database version\s*v3/.test(about), 'Settings shows app version and database version');
+      check(/App version/.test(about) && /Database version\s*v4/.test(about), 'Settings shows app version and database version');
       await page.screenshot({ path: `${dir}/settings-about.png` });
       await sleep(1500);
     }

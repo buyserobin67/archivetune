@@ -27,7 +27,7 @@ export function Art({ trackId, seed = '', className = '', rounded = 'rounded-lg'
       ) : (
         <FallbackCover seed={seed} />
       )}
-      <div className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/[0.07]" />
+      <div className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/[0.05]" />
     </div>
   );
 }

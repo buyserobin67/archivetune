@@ -8,7 +8,7 @@ import { ChevronRight, PauseIcon, PlayIcon } from './Icons';
 
 export function Section({ title, to, action, children }: { title: string; to?: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="mb-6">
+    <section className="mb-8">
       <div className="mb-3 flex items-center justify-between pl-gutter pr-gutter">
         {to ? (
           <Link to={to} className="press flex items-center gap-0.5 text-title font-bold">
@@ -30,7 +30,7 @@ export function Shelf({ children }: { children: ReactNode }) {
 
 export function TrackCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
   return (
-    <button className="press w-[8.75rem] text-left" onClick={onPlay} aria-label={`Play ${track.title}`}>
+    <button className="press w-[9.5rem] text-left" onClick={onPlay} aria-label={`Play ${track.title}`}>
       <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-lg" shadow />
       <div className="mt-2 truncate text-footnote font-semibold leading-snug">{track.title}</div>
       <div className="truncate text-caption text-fg-2">{track.artist}</div>
@@ -40,7 +40,7 @@ export function TrackCard({ track, onPlay }: { track: Track; onPlay: () => void 
 
 export function GroupCard({ group, base, round }: { group: Group; base: string; round?: boolean }) {
   return (
-    <Link to={`${base}/${encodeURIComponent(group.key)}`} className="press block w-[8.75rem] text-left">
+    <Link to={`${base}/${encodeURIComponent(group.key)}`} className="press block w-[9.5rem] text-left">
       <Art trackId={group.artTrackId} seed={group.name} className="w-full" rounded={round ? 'rounded-full' : 'rounded-lg'} shadow />
       <div className={`mt-2 truncate text-footnote font-semibold leading-snug ${round ? 'text-center' : ''}`}>{group.name}</div>
       <div className={`truncate text-caption text-fg-2 ${round ? 'text-center' : ''}`}>{group.subtitle}</div>
@@ -67,7 +67,7 @@ export function QuickPickCard({ track, onPlay }: { track: Track; onPlay: () => v
   const { track: cur, isPlaying } = usePlayer();
   const active = cur?.id === track.id;
   return (
-    <div className="relative w-[10.5rem]">
+    <div className="relative w-[11.5rem]">
       <button className="press block w-full text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
         <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-xl" shadow />
         <div className="pointer-events-none absolute inset-0 rounded-xl" style={{ background: 'linear-gradient(to top, rgb(0 0 0 / .82) 0%, rgb(0 0 0 / .25) 42%, transparent 62%)' }} />

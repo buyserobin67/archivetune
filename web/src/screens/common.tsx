@@ -17,7 +17,7 @@ export function ScreenHeader({ title, eyebrow, actions, back }: { title: string;
         )}
         <div className="min-w-0">
           {eyebrow && <div className="eyebrow mb-0.5 truncate">{eyebrow}</div>}
-          <h1 className="line-clamp-2 break-words text-title-lg font-extrabold">{title}</h1>
+          <h1 className="line-clamp-2 break-words text-title-lg font-bold">{title}</h1>
         </div>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -59,7 +59,7 @@ export function EmptyState({ title, body, showImport = true }: { title: string; 
 
 export function SearchField({ value, onChange, placeholder, autoFocus }: { value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean }) {
   return (
-    <label className="flex h-11 items-center gap-2 rounded-full bg-s2 px-3.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-accent">
+    <label className="flex h-11 items-center gap-2 rounded-full bg-s2 px-3.5 focus-within:ring-2 focus-within:ring-accent">
       <SearchIcon size={18} className="shrink-0 text-fg-3" />
       <input
         value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoFocus={autoFocus}
@@ -72,7 +72,7 @@ export function SearchField({ value, onChange, placeholder, autoFocus }: { value
 }
 
 export function Chip({ active, onClick, to, children, label }: { active?: boolean; onClick?: () => void; to?: string; children: ReactNode; label?: string }) {
-  const cls = `press inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-footnote font-semibold ${active ? 'bg-fg text-black' : 'bg-s2 text-fg-2 ring-1 ring-line'}`;
+  const cls = `press inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-footnote font-semibold ${active ? 'bg-fg text-black' : 'bg-s2 text-fg-2'}`;
   return to ? <Link to={to} className={cls} aria-current={active ? 'page' : undefined}>{children}</Link>
     : <button className={cls} onClick={onClick} aria-pressed={active} aria-label={label}>{children}</button>;
 }

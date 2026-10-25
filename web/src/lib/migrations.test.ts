@@ -53,6 +53,7 @@ describe('database migrations keep your library', () => {
       await assertLibraryIntact(d, from >= 2);
       // the stores added later exist and are empty, ready to use
       expect(await d.artEdits.count()).toBe(0);
+      expect(await d.plays.count()).toBe(0);
       expect(await readStoredVersion(dbName)).toBe(SCHEMA_VERSION);
       d.close();
     });
@@ -87,7 +88,8 @@ describe('database migrations keep your library', () => {
     await seedOld(dbName, 3);
     const future = new Dexie(dbName);
     future.version(3).stores({ tracks: 'id, &hash, title, artist, album, favorite, addedAt, lastPlayedAt', blobs: 'trackId', art: 'trackId', playlists: 'id, name, updatedAt', settings: 'key', lyrics: 'trackId', artEdits: 'trackId' });
-    future.version(4).stores({ extra: 'id' });
+    future.version(4).stores({ plays: '++id, at, trackId' });
+    future.version(5).stores({ extra: 'id' });
     await future.open();
     future.close();
     const d = new CadenceDB(dbName);
@@ -95,7 +97,7 @@ describe('database migrations keep your library', () => {
     // Dexie 4 opens a newer database as it is; if a browser reports VersionError instead, the app shows the recovery screen.
     if (r.ok) await assertLibraryIntact(d, true); else expect(r.reason).toBe('newer');
     d.close();
-    expect(await readStoredVersion(dbName)).toBe(4);
+    expect(await readStoredVersion(dbName)).toBe(5);
   });
 
   it('upgrades are additive: every old store keeps its original index definition', () => {
@@ -103,7 +105,7 @@ describe('database migrations keep your library', () => {
     const tracks = d.table('tracks').schema;
     expect(tracks.primKey.name).toBe('id');
     expect(tracks.indexes.map((i) => i.name).sort()).toEqual(['addedAt', 'album', 'artist', 'favorite', 'hash', 'lastPlayedAt', 'title']);
-    expect(d.tables.map((t) => t.name).sort()).toEqual(['art', 'artEdits', 'blobs', 'lyrics', 'playlists', 'settings', 'tracks']);
+    expect(d.tables.map((t) => t.name).sort()).toEqual(['art', 'artEdits', 'blobs', 'lyrics', 'playlists', 'plays', 'settings', 'tracks']);
   });
 
   it('records which builds opened the library, without growing forever', async () => {

@@ -9,6 +9,7 @@ import Library from './screens/Library';
 import { GroupDetail, PlaylistDetail } from './screens/Detail';
 import Search from './screens/Search';
 import Settings from './screens/Settings';
+import Recap from './screens/Recap';
 import { usePref } from './lib/hooks';
 import { isStandalone } from './lib/pwa';
 
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/library/playlists/:id" element={<PlaylistDetail />} />
           <Route path="/library/:tab" element={<Library />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/recap" element={<Recap />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </main>

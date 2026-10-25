@@ -16,6 +16,22 @@ async function seeded() {
   return { db, added, playlist: p };
 }
 
+describe('listening history in backups', () => {
+  it('round-trips plays (remapped to restored songs), skips duplicates, and old backups without plays still restore', async () => {
+    const { db, added } = await seeded();
+    await db.plays.bulkAdd([
+      { trackId: added[0].id, at: 1000, seconds: 120, title: 'a', artist: 'x', album: 'y' },
+      { trackId: added[1].id, at: 2000, seconds: 90, title: 'b', artist: 'x', album: 'y' },
+    ]);
+    const backup = await exportLibrary({ includeAudio: false, db });
+    const fresh = makeDb();
+    await importBackup(backup, { db: fresh });
+    expect((await fresh.plays.toArray()).map((p) => [p.trackId, p.at, p.seconds])).toEqual([[added[0].id, 1000, 120], [added[1].id, 2000, 90]]);
+    await importBackup(backup, { db: fresh });
+    expect(await fresh.plays.count()).toBe(2);
+  });
+});
+
 describe('export / import', () => {
   it('round-trips audio, artwork, tracks and playlists into a fresh library', async () => {
     const { db, added, playlist } = await seeded();

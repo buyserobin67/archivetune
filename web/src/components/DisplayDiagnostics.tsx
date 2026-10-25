@@ -49,7 +49,7 @@ export function DisplayDiagnostics() {
   return (
     <section className="mb-6 px-gutter" aria-labelledby="display-title">
       <h2 id="display-title" className="eyebrow mb-2 pl-1">Display</h2>
-      <div className="overflow-hidden rounded-lg bg-s1 p-4 ring-1 ring-line">
+      <div className="overflow-hidden rounded-lg bg-s1 p-4">
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-caption text-fg-2">
           <dt>Page viewport</dt><dd className="text-right text-fg">{info.inner}</dd>
           <dt>Screen</dt><dd className="text-right text-fg">{info.screen} @{info.dpr}x</dd>

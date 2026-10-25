@@ -150,7 +150,7 @@ function NowTab({ track, touch }: { track: Track; touch: Touchy }) {
         {/* my-auto centres the group when there is room and lets it scroll (instead of overlapping the controls) when text is very large. */}
         <div className="my-auto flex w-full flex-col items-center gap-4 py-2">
         <div className="w-[min(var(--cw),42dvh,max(7.5rem,calc(100dvh-22rem-var(--sat)-var(--sab))))] transition-transform duration-slow ease-spring" style={{ transform: s.isPlaying ? 'scale(1)' : 'scale(.92)' }}>
-          <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-[1.25rem]" vtName={playerOpen ? 'cadence-art' : undefined} shadow priority />
+          <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-xl" vtName={playerOpen ? 'cadence-art' : undefined} shadow priority />
         </div>
         <div className="flex w-[var(--cw)] items-center gap-2" style={{ touchAction: 'auto' }}>
           <div className="min-w-0 flex-1">
@@ -362,7 +362,7 @@ function PlayButton({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
   const lg = size === 'lg';
   return (
     <button
-      className={`press flex items-center justify-center bg-fg text-black shadow-float ${lg ? 'h-[min(4.5rem,19vw)] w-[min(4.5rem,19vw)] rounded-[min(1.375rem,6vw)]' : 'h-14 w-14 rounded-[1.125rem]'}`}
+      className={`press flex items-center justify-center bg-fg text-black shadow-float ${lg ? 'h-[min(4.5rem,19vw)] w-[min(4.5rem,19vw)] rounded-[min(1.375rem,6vw)]' : 'h-14 w-14 rounded-xl'}`}
       onClick={() => void p.toggle()} aria-label={s.isPlaying ? 'Pause' : 'Play'}
     >
       {s.isPlaying ? <PauseIcon size={lg ? 32 : 26} /> : <PlayIcon size={lg ? 32 : 26} className="ml-0.5" />}

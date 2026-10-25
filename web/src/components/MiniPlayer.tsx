@@ -14,7 +14,7 @@ export function MiniPlayer() {
   return (
     <div className="px-3 pb-1.5">
       <div
-        className="relative mx-auto max-w-md overflow-hidden rounded-2xl shadow-float ring-1 ring-white/[0.07]"
+        className="relative mx-auto max-w-md overflow-hidden rounded-2xl shadow-float"
         style={{ background: 'linear-gradient(100deg, color-mix(in srgb, rgb(var(--art-rgb)) 16%, var(--surface-2)), var(--surface-2) 75%)' }}
       >
         <div className="flex items-center py-1 pl-1.5 pr-0.5">

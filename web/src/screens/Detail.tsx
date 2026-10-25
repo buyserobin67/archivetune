@@ -29,7 +29,7 @@ function Hero({ back, trackId, seed, title, meta, round, children, collage }: {
         <div className={`aspect-square w-[min(12rem,55vw)] overflow-hidden shadow-art ${round ? 'rounded-full' : 'rounded-xl'}`}>
           {collage ? <Collage tracks={collage} seed={seed} /> : <Art trackId={trackId} seed={seed} className="h-full w-full" rounded="rounded-none" priority />}
         </div>
-        <h1 className="mt-4 line-clamp-2 max-w-full text-title-lg font-extrabold">{title}</h1>
+        <h1 className="mt-4 line-clamp-2 max-w-full text-title-lg font-bold">{title}</h1>
         <div className="mt-0.5 text-footnote text-fg-2">{meta}</div>
         {children}
       </div>
@@ -48,7 +48,7 @@ function Actions({ ids }: { ids: string[] }) {
   return (
     <div className="mt-4 flex w-full max-w-xs gap-3">
       <button className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-fg font-semibold text-black" onClick={() => void p.playQueue(ids, 0)}><PlayIcon size={18} /> Play</button>
-      <button className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white/10 font-semibold ring-1 ring-white/10" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); }}><ShuffleIcon size={18} /> Shuffle</button>
+      <button className="press flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white/10 font-semibold" onClick={() => { p.setShuffle(true); void p.playQueue(ids, Math.floor(Math.random() * ids.length)); }}><ShuffleIcon size={18} /> Shuffle</button>
     </div>
   );
 }
@@ -104,7 +104,7 @@ export function PlaylistDetail() {
       </Hero>
       {renaming && (
         <form className="mb-3 flex gap-2 px-gutter" onSubmit={async (e) => { e.preventDefault(); await renamePlaylist(pl.id, name); setRenaming(false); }}>
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-label="Playlist name" className="min-w-0 flex-1 rounded-full bg-s2 px-4 py-3 outline-none ring-1 ring-line focus:ring-2 focus:ring-accent" />
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} aria-label="Playlist name" className="min-w-0 flex-1 rounded-full bg-s2 px-4 py-3 outline-none focus:ring-2 focus:ring-accent" />
           <button className="press rounded-full bg-accent px-5 font-semibold text-black">Save</button>
         </form>
       )}

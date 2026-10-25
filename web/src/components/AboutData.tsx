@@ -32,7 +32,7 @@ export function AboutData() {
   return (
     <section className="mb-6 px-gutter" data-testid="about-data">
       <h2 className="eyebrow mb-2 pl-1">About & data</h2>
-      <div className="overflow-hidden rounded-lg bg-s1 p-4 ring-1 ring-line">
+      <div className="overflow-hidden rounded-lg bg-s1 p-4">
         <dl className="space-y-1.5 text-footnote">
           {rows.map(([k, v]) => (
             <div key={k} className="flex justify-between gap-4"><dt className="text-fg-2">{k}</dt><dd className="min-w-0 break-all text-right font-medium text-fg">{v}</dd></div>

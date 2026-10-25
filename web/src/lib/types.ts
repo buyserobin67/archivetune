@@ -98,3 +98,16 @@ export interface ArtEdit {
   to?: { w: number; h: number };
   createdAt: number;
 }
+
+/** One qualifying listen (30 s, or half of a short song). Names are copied so the recap survives deleting or renaming a song. Stays on this device. */
+export interface PlayEvent {
+  id?: number;
+  trackId: string;
+  /** When the listen started counting (ms since epoch). */
+  at: number;
+  /** Seconds actually listened, not skipped. */
+  seconds: number;
+  title: string;
+  artist: string;
+  album: string;
+}

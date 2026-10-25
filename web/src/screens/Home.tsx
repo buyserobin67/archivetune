@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CadenceMark, SettingsIcon, ShuffleIcon, PlayIcon } from '../components/Icons';
+import { CadenceMark, ChevronRight, SettingsIcon, ShuffleIcon, PlayIcon } from '../components/Icons';
 import { ExamplePreview, GroupCard, ListenRow, QuickPickCard, Section, Shelf, TrackCard } from '../components/Cards';
+import { ShelfSkeleton } from '../components/Skeletons';
 import { ImportButton } from '../components/ImportButton';
 import { groupAlbums } from '../lib/library';
 import { availableMoods, quickPicks, tracksForMood, type MoodId } from '../lib/moods';
 import { getPlayer } from '../lib/player';
 import { useTracks } from '../lib/hooks';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../lib/db';
+import { computeRecap, formatListening } from '../lib/stats';
 import { Chip, RoundButton } from './common';
 
 export default function Home() {
@@ -14,6 +18,8 @@ export default function Home() {
   const nav = useNavigate();
   const p = getPlayer();
   const [mood, setMood] = useState<MoodId | null>(null);
+  const week = useLiveQuery(() => db.plays.where('at').aboveOrEqual(Date.now() - 8 * 86_400_000).toArray(), []);
+  const weekRecap = useMemo(() => computeRecap(week ?? [], 'week'), [week]);
 
   const data = useMemo(() => {
     const all = tracks ?? [];
@@ -44,7 +50,7 @@ export default function Home() {
       <header className="flex items-center justify-between gap-3 px-gutter pb-3" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)' }}>
         <Link to="/" className="flex min-w-0 items-center gap-2" aria-label="Cadence home">
           <CadenceMark size={26} className="shrink-0 text-fg" />
-          <span className="truncate text-title font-extrabold tracking-tight">Cadence</span>
+          <span className="truncate text-title font-bold tracking-tight">Cadence</span>
         </Link>
         <div className="flex shrink-0 items-center gap-2">
           {!!tracks?.length && <RoundButton label="Shuffle all songs" onClick={shuffleAll}><ShuffleIcon size={16} /></RoundButton>}
@@ -52,6 +58,8 @@ export default function Home() {
           <RoundButton label="Settings" onClick={() => nav('/settings')}><SettingsIcon size={18} /></RoundButton>
         </div>
       </header>
+
+      {!tracks && <ShelfSkeleton />}
 
       {tracks && tracks.length === 0 && <Welcome />}
 
@@ -61,6 +69,17 @@ export default function Home() {
             <Chip key={m.id} active={mood === m.id} onClick={() => setMood(mood === m.id ? null : m.id)} label={`${m.label}: ${m.why}`}>{m.label}</Chip>
           ))}
         </div>
+      )}
+
+      {!!tracks?.length && (
+        <Link to="/recap" className="press mx-gutter mb-6 flex items-center justify-between rounded-xl bg-s1 p-4" aria-label="Open your listening recap">
+          <span className="min-w-0">
+            <span className="block text-caption uppercase tracking-wider text-fg-3">{weekRecap.plays ? 'Your week' : 'Recap'}</span>
+            <span className="mt-0.5 block truncate text-title font-bold">{weekRecap.plays ? formatListening(weekRecap.seconds) : 'Your recap'}</span>
+            <span className="block truncate text-footnote text-fg-2">{weekRecap.plays ? `${weekRecap.plays} plays · ${weekRecap.topArtists[0]?.name ?? ''}` : 'Day, week, month and year, on this device'}</span>
+          </span>
+          <ChevronRight size={20} className="shrink-0 text-fg-3" />
+        </Link>
       )}
 
       {picks.length > 0 && (

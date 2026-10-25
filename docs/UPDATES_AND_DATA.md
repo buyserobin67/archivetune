@@ -25,7 +25,7 @@ Nothing restarts by itself, so an update never interrupts a song.
 
 ## Settings → About & data
 
-Shows the app version and build, the database version (this build expects v3), whether you are in Safari or the Home Screen app, the address you are on, an update history for this device, and a **Check for updates** button.
+Shows the app version and build, the database version (this build expects v4), whether you are in Safari or the Home Screen app, the address you are on, an update history for this device, and a **Check for updates** button.
 
 ## Database changes (for developers)
 
@@ -66,3 +66,7 @@ The production URL stays fixed because Cloudflare serves production from one **p
 4. If a release is bad, roll back in Cloudflare (Deployments → previous deployment → Rollback) or revert the commit. Rolling back never touches data. Database versions only go up, so a build older than the data cannot downgrade it; it opens the newer database as it is.
 
 Current state: the Cloudflare production branch is whatever you configured. This work does not change it.
+
+## Listening recap data (database v4)
+
+Version 4 added one table, `plays`, that logs a qualifying listen (30 seconds, or half of a song shorter than a minute) with the song's title, artist and album copied in, so recaps survive renaming or deleting a song. It is created empty on upgrade; every existing table and row is untouched. It stays on the device, is included in backups, and Settings → Listening recap → Clear listening history empties only this table.

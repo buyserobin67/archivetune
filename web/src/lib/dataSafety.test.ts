@@ -41,6 +41,7 @@ describe('data safety guard', () => {
     expect(src).toContain("constructor(name = 'cadence')");
     expect(src).toContain("this.version(2).stores({ lyrics: 'trackId' })");
     expect(src).toContain("this.version(3).stores({ artEdits: 'trackId' })");
+    expect(src).toContain("this.version(4).stores({ plays: '++id, at, trackId' })");
     expect(src).toContain("tracks: 'id, &hash, title, artist, album, favorite, addedAt, lastPlayedAt'");
   });
 });
