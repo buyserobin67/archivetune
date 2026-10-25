@@ -13,6 +13,10 @@ export interface PlayerState {
   interrupted: boolean;
   error: string | null;
   queue: Q.QueueState;
+  /** Epoch ms when the sleep timer fires, or null. */
+  sleepEndsAt: number | null;
+  /** Stop when the current track finishes. */
+  sleepEndOfTrack: boolean;
 }
 
 export interface TimeState { currentTime: number; duration: number }
@@ -47,7 +51,7 @@ export class Player {
   private makeMetadata: NonNullable<PlayerDeps['makeMetadata']>;
   private fallbackArt: string;
 
-  private state: PlayerState = { track: null, isPlaying: false, loading: false, interrupted: false, error: null, queue: Q.emptyQueue() };
+  private state: PlayerState = { track: null, isPlaying: false, loading: false, interrupted: false, error: null, queue: Q.emptyQueue(), sleepEndsAt: null, sleepEndOfTrack: false };
   private time: TimeState = { currentTime: 0, duration: 0 };
   private listeners = new Set<() => void>();
   private timeListeners = new Set<() => void>();
@@ -60,6 +64,7 @@ export class Player {
   private consecutiveFailures = 0;
   private lastPosSave = 0;
   private lastPosState = 0;
+  private sleepTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(deps: PlayerDeps) {
     this.audio = deps.audio;
@@ -131,6 +136,15 @@ export class Player {
   }
 
   private async onEnded() {
+    if (this.state.sleepEndOfTrack) {
+      this.clearSleep();
+      this.userPaused = true;
+      this.set({ isPlaying: false });
+      this.audio.currentTime = 0;
+      this.setTime({ currentTime: 0 });
+      this.syncSession();
+      return;
+    }
     const { state, ended } = Q.next(this.state.queue, true);
     if (state.repeat === 'one' && !ended) {
       this.audio.currentTime = 0;
@@ -317,6 +331,24 @@ export class Player {
     this.set({ queue: Q.prune(this.state.queue, (id) => ids.has(id)) });
     if (cur && !ids.has(cur)) await this.loadCurrent(false);
     this.persistQueue();
+  }
+
+  // ---- sleep timer ----
+  /** minutes: stop after that long. 'track': stop when the current track ends. null: cancel. */
+  setSleep(when: number | 'track' | null) {
+    if (this.sleepTimer) clearTimeout(this.sleepTimer);
+    this.sleepTimer = null;
+    if (when === null) return this.set({ sleepEndsAt: null, sleepEndOfTrack: false });
+    if (when === 'track') return this.set({ sleepEndsAt: null, sleepEndOfTrack: true });
+    const ms = Math.max(1, when) * 60_000;
+    this.sleepTimer = setTimeout(() => { this.clearSleep(); this.pause(); }, ms);
+    this.set({ sleepEndsAt: Date.now() + ms, sleepEndOfTrack: false });
+  }
+
+  private clearSleep() {
+    if (this.sleepTimer) clearTimeout(this.sleepTimer);
+    this.sleepTimer = null;
+    this.set({ sleepEndsAt: null, sleepEndOfTrack: false });
   }
 
   // ---- persistence ----

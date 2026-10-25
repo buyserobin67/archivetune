@@ -23,6 +23,8 @@ CI does this automatically (`.github/workflows/web-pages.yml`). See [../docs/WEB
 | `src/lib/queue.ts` | pure queue model (shuffle, repeat, move, remove) |
 | `src/lib/player.ts` | the single audio element + Media Session + restore |
 | `src/lib/backup.ts` | `.cadence` export/restore (lazy `Blob.slice`, no giant buffers) |
+| `src/lib/lrc.ts`, `lyrics.ts` | LRC parser, sidecar matching, embedded lyrics (never fetched online) |
+| `src/lib/moods.ts` | rule-based mood chips + Quick Picks from real library data |
 | `src/lib/storage.ts` | quota estimate, persistence request, warnings |
 | `src/sources/` | `MusicSource` interface, direct-URL and catalog sources, license gate |
 | `public/sw.js` | service worker; `vite.config.ts` injects the file list + version at build |

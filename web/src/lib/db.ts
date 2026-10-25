@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Playlist, Setting, Track, TrackArt, TrackBlob } from './types';
+import type { Lyrics, Playlist, Setting, Track, TrackArt, TrackBlob } from './types';
 
 export class CadenceDB extends Dexie {
   tracks!: Table<Track, string>;
@@ -7,6 +7,7 @@ export class CadenceDB extends Dexie {
   art!: Table<TrackArt, string>;
   playlists!: Table<Playlist, string>;
   settings!: Table<Setting, string>;
+  lyrics!: Table<Lyrics, string>;
 
   constructor(name = 'cadence') {
     super(name);
@@ -18,6 +19,8 @@ export class CadenceDB extends Dexie {
       playlists: 'id, name, updatedAt',
       settings: 'key',
     });
+    // v2 only adds a table: every v1 store and row is carried over untouched.
+    this.version(2).stores({ lyrics: 'trackId' });
   }
 }
 

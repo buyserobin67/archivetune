@@ -177,3 +177,41 @@ describe('Media Session', () => {
     expect(() => new Player({ audio: new FakeAudio().asAudio(), db: makeDb(), mediaSession: ms })).not.toThrow();
   });
 });
+
+describe('sleep timer', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('pauses after the chosen minutes and clears itself', async () => {
+    const { player, ids } = await setup();
+    await player.playQueue(ids, 0);
+    vi.useFakeTimers();
+    player.setSleep(10);
+    expect(player.getState().sleepEndsAt).toBeGreaterThan(Date.now());
+    vi.advanceTimersByTime(9 * 60_000);
+    expect(player.getState().isPlaying).toBe(true);
+    vi.advanceTimersByTime(61_000);
+    expect(player.getState()).toMatchObject({ isPlaying: false, sleepEndsAt: null });
+  });
+
+  it('can be cancelled', async () => {
+    const { player, ids } = await setup();
+    await player.playQueue(ids, 0);
+    vi.useFakeTimers();
+    player.setSleep(5);
+    player.setSleep(null);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(player.getState().isPlaying).toBe(true);
+    expect(player.getState().sleepEndsAt).toBeNull();
+  });
+
+  it('"end of track" stops instead of advancing', async () => {
+    const { audio, player, ids } = await setup();
+    await player.playQueue(ids, 0);
+    player.setSleep('track');
+    expect(player.getState().sleepEndOfTrack).toBe(true);
+    audio.finish();
+    await tick(10);
+    expect(player.getState()).toMatchObject({ isPlaying: false, sleepEndOfTrack: false });
+    expect(player.getState().track?.id).toBe(ids[0]);
+  });
+});

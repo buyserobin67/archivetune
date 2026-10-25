@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useUI } from '../lib/ui';
-import { HomeIcon, LibraryIcon, SearchIcon, SettingsIcon } from './Icons';
+import { HomeIcon, LibraryIcon, SearchIcon } from './Icons';
 import { MiniPlayer } from './MiniPlayer';
 
 const TABS = [
   { to: '/', label: 'Home', Icon: HomeIcon, end: true },
   { to: '/search', label: 'Search', Icon: SearchIcon },
   { to: '/library/songs', label: 'Library', Icon: LibraryIcon, prefix: '/library' },
-  { to: '/settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
 /** True while the on-screen keyboard is up, so the dock doesn't float on top of it. */
@@ -25,6 +24,7 @@ function useKeyboardOpen(): boolean {
   return open;
 }
 
+/** Mini-player directly above a compact floating tab bar (Home, Search, Library). */
 export function Dock() {
   const ref = useRef<HTMLDivElement>(null);
   const keyboard = useKeyboardOpen();
@@ -45,8 +45,8 @@ export function Dock() {
   return (
     <div
       ref={ref}
-      className="absolute inset-x-0 bottom-0 z-30 transition-transform duration-slow ease-out"
-      style={{ transform: keyboard ? 'translateY(110%)' : undefined, background: 'linear-gradient(to top, var(--bg) 55%, transparent)' }}
+      className="absolute inset-x-0 bottom-0 z-30 pt-4 transition-transform duration-slow ease-out"
+      style={{ transform: keyboard ? 'translateY(120%)' : undefined, background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}
     >
       {toast && (
         <div key={toast.id} className="pointer-events-none absolute inset-x-0 bottom-full flex justify-center px-4 pb-2" role="status" aria-live="polite">
@@ -54,15 +54,15 @@ export function Dock() {
         </div>
       )}
       <MiniPlayer />
-      <nav aria-label="Primary" className="border-t border-line bg-bg pb-[var(--sab)]">
-        <ul className="mx-auto flex max-w-xl">
+      <nav aria-label="Primary" className="px-3" style={{ paddingBottom: 'calc(var(--sab) * 0.6 + 0.5rem)' }}>
+        <ul className="mx-auto flex max-w-md rounded-[1.375rem] bg-s1 px-1 ring-1 ring-white/[0.06] shadow-float">
           {TABS.map(({ to, label, Icon, end, prefix }) => (
             <li key={to} className="flex-1">
               <NavLink to={to} end={end} className={({ isActive }) => {
                 const on = isActive || (prefix ? pathname.startsWith(prefix) : false);
-                return `press relative flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-caption font-medium ${on ? 'text-accent-text' : 'text-fg-3'}`;
+                return `press flex h-14 flex-col items-center justify-center gap-0.5 text-caption ${on ? 'font-semibold text-fg' : 'font-medium text-fg-2'}`;
               }}>
-                <Icon size={24} />
+                <Icon size={22} />
                 {label}
               </NavLink>
             </li>

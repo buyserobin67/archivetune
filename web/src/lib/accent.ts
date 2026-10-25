@@ -20,9 +20,10 @@ export function useTrackPalette(track: Track | null): Palette {
 }
 
 export function applyAccent(p: Palette, el: HTMLElement = document.documentElement): void {
-  el.style.setProperty('--accent-rgb', rgbCss(p.accent));
-  el.style.setProperty('--accent2-rgb', rgbCss(p.accent2));
-  el.style.setProperty('--accent-text-rgb', rgbCss(p.accentText));
+  // Artwork colours only feed the --art* variables; the primary accent stays white.
+  el.style.setProperty('--art-rgb', rgbCss(p.accent));
+  el.style.setProperty('--art2-rgb', rgbCss(p.accent2));
+  el.style.setProperty('--art-text-rgb', rgbCss(p.accentText));
   el.style.setProperty('--tint-rgb', rgbCss(p.tint));
 }
 

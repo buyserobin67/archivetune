@@ -14,10 +14,10 @@ export interface Palette {
 }
 
 export const DEFAULT_PALETTE: Palette = {
-  accent: [139, 92, 246],
-  accent2: [91, 64, 180],
-  accentText: [196, 181, 253],
-  tint: [26, 16, 54],
+  accent: [150, 150, 160],
+  accent2: [90, 90, 100],
+  accentText: [210, 210, 220],
+  tint: [40, 42, 48],
 };
 
 // ---- colour maths (pure, unit-tested) ----

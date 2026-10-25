@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import type { Group } from '../lib/library';
 import type { Track } from '../lib/types';
+import { getPlayer, usePlayer } from '../lib/player';
 import { Art } from './Art';
-import { ChevronRight } from './Icons';
+import { ChevronRight, PauseIcon, PlayIcon } from './Icons';
 
 export function Section({ title, to, action, children }: { title: string; to?: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="mb-7">
+    <section className="mb-6">
       <div className="mb-3 flex items-center justify-between pl-gutter pr-gutter">
         {to ? (
           <Link to={to} className="press flex items-center gap-0.5 text-title font-bold">
@@ -58,5 +59,76 @@ export function GroupGrid({ groups, base, round }: { groups: Group[]; base: stri
         </Link>
       ))}
     </div>
+  );
+}
+
+/** Large, immersive Quick Pick card: the cover fills the card, text sits on a scrim. */
+export function QuickPickCard({ track, onPlay }: { track: Track; onPlay: () => void }) {
+  const { track: cur, isPlaying } = usePlayer();
+  const active = cur?.id === track.id;
+  return (
+    <div className="relative w-[10.5rem]">
+      <button className="press block w-full text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
+        <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-xl" shadow />
+        <div className="pointer-events-none absolute inset-0 rounded-xl" style={{ background: 'linear-gradient(to top, rgb(0 0 0 / .82) 0%, rgb(0 0 0 / .25) 42%, transparent 62%)' }} />
+        <div className="absolute inset-x-0 bottom-0 p-3 pr-12">
+          <div className="truncate text-body font-semibold leading-tight">{track.title}</div>
+          <div className="truncate text-caption text-white/70">{track.artist}</div>
+        </div>
+      </button>
+      <button
+        className="press absolute bottom-2.5 right-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-fg text-black shadow-card"
+        aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
+        onClick={() => (active ? void getPlayer().toggle() : onPlay())}
+      >
+        {active && isPlaying ? <PauseIcon size={16} /> : <PlayIcon size={16} className="ml-px" />}
+      </button>
+    </div>
+  );
+}
+
+/** Compact Keep Listening row: cover, text, one small circular play/pause control. */
+export function ListenRow({ track, onPlay }: { track: Track; onPlay: () => void }) {
+  const { track: cur, isPlaying } = usePlayer();
+  const active = cur?.id === track.id;
+  return (
+    <div className="cv-row flex items-center gap-3 px-gutter py-1.5">
+      <button className="press flex min-w-0 flex-1 items-center gap-3 text-left" onClick={onPlay} aria-label={`Play ${track.title} by ${track.artist}`}>
+        <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="h-12 w-12" rounded="rounded-lg" />
+        <div className="min-w-0 flex-1">
+          <div className={`truncate text-body font-medium ${active ? 'text-art-text' : ''}`}>{track.title}</div>
+          <div className="truncate text-footnote text-fg-2">{track.artist}</div>
+        </div>
+      </button>
+      <button className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-s2" aria-label={active && isPlaying ? `Pause ${track.title}` : `Play ${track.title}`} onClick={() => (active ? void getPlayer().toggle() : onPlay())}>
+        {active && isPlaying ? <PauseIcon size={16} /> : <PlayIcon size={16} className="ml-px" />}
+      </button>
+    </div>
+  );
+}
+
+/** Clearly-labelled, non-interactive sample of what Quick Picks will look like. These are not songs. */
+export function ExamplePreview() {
+  return (
+    <section className="mb-6" aria-label="Example layout. Not real songs.">
+      <div className="mb-3 flex items-center gap-2 px-gutter">
+        <h2 className="text-title font-bold text-fg-3">Quick Picks</h2>
+        <span className="rounded-full bg-s2 px-2 py-0.5 text-caption font-semibold uppercase tracking-wide text-fg-2">Example</span>
+      </div>
+      <div className="row-scroll hide-scroll gap-3.5 px-gutter pb-1" aria-hidden="true" style={{ pointerEvents: 'none' }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="w-[9rem] opacity-60">
+            <div className="relative aspect-square overflow-hidden rounded-xl border border-dashed border-white/15 bg-s1">
+              <div className="absolute inset-x-3 bottom-3 space-y-1.5">
+                <div className="h-2.5 w-3/4 rounded-full bg-white/15" />
+                <div className="h-2 w-1/2 rounded-full bg-white/10" />
+              </div>
+              <div className="absolute bottom-2.5 right-2.5 h-8 w-8 rounded-full bg-white/10" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 px-gutter text-caption text-fg-3">Placeholder cards only. Your own songs appear here after you import them.</p>
+    </section>
   );
 }

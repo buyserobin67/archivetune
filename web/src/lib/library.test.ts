@@ -30,7 +30,8 @@ describe('importing audio', () => {
       { db, parse: fakeParser() },
     );
     expect(s.added).toHaveLength(3);
-    expect(s.failed.map((f) => f.name).sort()).toEqual(['noext', 'notes.txt']);
+    expect(s.failed.map((f) => f.name)).toEqual(['noext']);
+    expect(s.lyricsUnmatched).toEqual(['notes.txt']); // .txt is treated as a lyric sidecar, and nothing matched it
   });
 
   it('guesses a mime type from the extension when Files gives none', async () => {

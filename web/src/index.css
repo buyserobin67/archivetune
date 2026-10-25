@@ -39,8 +39,8 @@ input, textarea, select { font-size: max(1rem, 16px); }
   .scroll-y { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
   .hide-scroll { scrollbar-width: none; }
   .hide-scroll::-webkit-scrollbar { display: none; }
-  .row-scroll { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scroll-padding-inline: var(--gutter); overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
-  .row-scroll > * { scroll-snap-align: start; flex: none; }
+  .row-scroll { display: flex; overflow-x: auto; overflow-y: hidden;  overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .row-scroll > * { flex: none; }
   /* press feedback: transform+opacity only, cheap on iPhone */
   .press { transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) linear; will-change: transform; }
   .press:active { transform: scale(0.97); opacity: 0.8; }
@@ -51,9 +51,9 @@ input, textarea, select { font-size: max(1rem, 16px); }
 }
 
 /* seek bar */
-input[type='range'].seek { -webkit-appearance: none; appearance: none; height: 2.25rem; background: transparent; width: 100%; margin: 0; touch-action: none; }
-input[type='range'].seek::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; background: linear-gradient(to right, rgb(255 255 255 / 0.92) var(--p, 0%), rgb(255 255 255 / 0.2) var(--p, 0%)); }
-input[type='range'].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.5); transition: transform var(--dur-fast) var(--ease-out); }
+input[type='range'].seek { -webkit-appearance: none; appearance: none; height: 1.75rem; background: transparent; width: 100%; margin: 0; touch-action: none; }
+input[type='range'].seek::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: linear-gradient(to right, rgb(255 255 255 / 0.92) var(--p, 0%), rgb(255 255 255 / 0.2) var(--p, 0%)); }
+input[type='range'].seek::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4.5px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / 0.5); transition: transform var(--dur-fast) var(--ease-out); }
 input[type='range'].seek:active::-webkit-slider-thumb { transform: scale(1.35); }
 input[type='range'].seek::-moz-range-track { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.2); }
 input[type='range'].seek::-moz-range-progress { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.92); }

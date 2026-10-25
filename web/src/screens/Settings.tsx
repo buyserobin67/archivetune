@@ -57,7 +57,7 @@ export default function Settings() {
 
   return (
     <div className="page-enter">
-      <ScreenHeader title="Settings" />
+      <ScreenHeader title="Settings" back="/" />
 
       <Group title="Storage" footer="iOS decides whether stored website data is kept. Keep your originals in Files and make backups.">
         {storage?.supported ? (

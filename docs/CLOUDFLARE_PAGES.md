@@ -42,6 +42,16 @@ Every push to `claude/cadence-web-redesign` triggers a new build and deploy auto
 - The `pages.dev` URL itself is reachable by anyone who knows it (it contains only the app, no music). Cloudflare Zero Trust **Access** (free for up to 50 users) can put a login in front of it, but that is optional and has more setup steps.
 - Branches other than the production branch get separate preview URLs. You can turn that off in the project's **Settings → Builds → Branch control**.
 
+## Trying a new UI branch without touching production
+
+Cloudflare builds every non-production branch as a **preview deployment** (on by default). To test `claude/cadence-web-compact-ui`:
+
+1. Cloudflare dashboard → Workers & Pages → your project → **Deployments**.
+2. Under **Preview**, open the newest deployment for that branch and tap **Visit**. The branch URL looks like `https://claude-cadence-web-compact-ui.<project>.pages.dev` (slashes become dashes).
+3. Add it to the Home Screen the same way. A preview has its own origin, so its library starts empty: import a few songs, or use Settings → Export / Restore backup to move your library over.
+
+Production stays on the branch you set during setup. Changing it is a deliberate step (Settings → Builds → Branch control) and is not done by the code in this repo.
+
 ## Switching or rolling back
 
 - Test the original UI: project **Settings → Builds → Branch control → Production branch** → `claude/cadence-web-mvp`, then **Retry deployment** / push.

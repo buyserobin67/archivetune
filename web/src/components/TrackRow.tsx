@@ -17,10 +17,10 @@ export const TrackRow = memo(function TrackRow({ track, onPlay, trailing, index 
           {active && <Equalizer playing={isPlaying} />}
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`truncate text-body-lg font-medium leading-snug ${active ? 'text-accent-text' : 'text-fg'}`}>{track.title}</div>
+          <div className={`truncate text-body-lg font-medium leading-snug ${active ? 'text-art-text' : 'text-fg'}`}>{track.title}</div>
           <div className="truncate text-footnote text-fg-2">{track.artist}{track.album !== 'Unknown Album' ? ` · ${track.album}` : ''}</div>
         </div>
-        {track.favorite === 1 && <HeartIcon size={14} filled className="shrink-0 text-accent-text" />}
+        {track.favorite === 1 && <HeartIcon size={14} filled className="shrink-0 text-fg-2" />}
       </button>
       {trailing}
       <button className="press tap text-fg-3" aria-label={`More actions for ${track.title}`} onClick={() => ui.openTrackSheet(track.id)}>
@@ -36,7 +36,7 @@ function Equalizer({ playing }: { playing: boolean }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="h-4 w-[3px] origin-bottom rounded-full bg-accent-text"
+          className="h-4 w-[3px] origin-bottom rounded-full bg-art-text"
           style={{ transform: playing ? undefined : 'scaleY(.35)', animation: playing ? `eq .8s ${i * 0.17}s ease-in-out infinite alternate` : 'none' }}
         />
       ))}

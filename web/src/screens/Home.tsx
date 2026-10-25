@@ -1,74 +1,121 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { GroupCard, Section, Shelf, TrackCard } from '../components/Cards';
-import { ShuffleIcon } from '../components/Icons';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CadenceMark, SettingsIcon, ShuffleIcon, PlayIcon } from '../components/Icons';
+import { ExamplePreview, GroupCard, ListenRow, QuickPickCard, Section, Shelf, TrackCard } from '../components/Cards';
 import { ImportButton } from '../components/ImportButton';
-import { TrackRow } from '../components/TrackRow';
 import { groupAlbums } from '../lib/library';
+import { availableMoods, quickPicks, tracksForMood, type MoodId } from '../lib/moods';
 import { getPlayer } from '../lib/player';
 import { useTracks } from '../lib/hooks';
-import { EmptyState, RoundButton, ScreenHeader } from './common';
-
-function greeting() {
-  const h = new Date().getHours();
-  return h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-}
+import { Chip, RoundButton } from './common';
 
 export default function Home() {
   const tracks = useTracks();
-  const greet = useMemo(greeting, []);
+  const nav = useNavigate();
   const p = getPlayer();
+  const [mood, setMood] = useState<MoodId | null>(null);
 
   const data = useMemo(() => {
     const all = tracks ?? [];
-    const ids = all.map((t) => t.id);
+    const recent = all.filter((t) => t.lastPlayedAt).sort((a, b) => b.lastPlayedAt - a.lastPlayedAt);
+    const recentAlbumKeys = new Set(recent.map((t) => `${t.album}\u0000${t.artist}`));
+    const albums = groupAlbums(all);
+    const moods = availableMoods(all);
     return {
-      ids,
-      recent: all.filter((t) => t.lastPlayedAt).sort((a, b) => b.lastPlayedAt - a.lastPlayedAt).slice(0, 12),
+      all,
+      ids: all.map((t) => t.id),
+      picks: quickPicks(all, 10),
+      moods,
+      listening: recent.slice(0, 4),
+      recentAlbums: albums.filter((g) => recentAlbumKeys.has(g.key)).slice(0, 12),
       favorites: all.filter((t) => t.favorite === 1).slice(0, 12),
-      albums: groupAlbums(all).slice(0, 12),
-      added: [...all].sort((a, b) => b.addedAt - a.addedAt).slice(0, 6),
+      albums: albums.slice(0, 12),
     };
   }, [tracks]);
 
-  if (!tracks) return <ScreenHeader title={greet} />;
-  if (!tracks.length) {
-    return (
-      <div>
-        <ScreenHeader title="Cadence" eyebrow={greet} />
-        <EmptyState title="Your library is empty" body="Import songs from the Files app. They stay on this device and play offline." />
-      </div>
-    );
-  }
-  const playFrom = (i: number) => void p.playQueue(data.ids, i);
+  const activeMood = data.moods.find((m) => m.id === mood) ?? null;
+  const picks = activeMood ? tracksForMood(data.all, activeMood.id).slice(0, 12) : data.picks;
+  const playFromAll = (id: string) => void p.playQueue(data.ids, data.ids.indexOf(id));
+  const playList = (list: { id: string }[], i: number) => void p.playQueue(list.map((t) => t.id), i);
   const shuffleAll = () => { p.setShuffle(true); void p.playQueue(data.ids, Math.floor(Math.random() * data.ids.length)); };
+
   return (
     <div className="page-enter">
-      <ScreenHeader
-        title={greet}
-        eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-        actions={<><RoundButton label="Shuffle all songs" onClick={shuffleAll}><ShuffleIcon size={18} /></RoundButton><ImportButton variant="icon" label="Import music" /></>}
-      />
+      <header className="flex items-center justify-between gap-3 px-gutter pb-3" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)' }}>
+        <Link to="/" className="flex min-w-0 items-center gap-2" aria-label="Cadence home">
+          <CadenceMark size={26} className="shrink-0 text-fg" />
+          <span className="truncate text-title font-extrabold tracking-tight">Cadence</span>
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          {!!tracks?.length && <RoundButton label="Shuffle all songs" onClick={shuffleAll}><ShuffleIcon size={16} /></RoundButton>}
+          <ImportButton variant="icon" label="Import music" />
+          <RoundButton label="Settings" onClick={() => nav('/settings')}><SettingsIcon size={18} /></RoundButton>
+        </div>
+      </header>
 
-      {data.recent.length > 0 && (
-        <Section title="Jump back in">
-          <Shelf>{data.recent.map((t) => <TrackCard key={t.id} track={t} onPlay={() => playFrom(data.ids.indexOf(t.id))} />)}</Shelf>
+      {tracks && tracks.length === 0 && <Welcome />}
+
+      {data.moods.length > 0 && (
+        <div className="row-scroll hide-scroll gap-2 px-gutter pb-4" role="group" aria-label="Moods">
+          {data.moods.map((m) => (
+            <Chip key={m.id} active={mood === m.id} onClick={() => setMood(mood === m.id ? null : m.id)} label={`${m.label}: ${m.why}`}>{m.label}</Chip>
+          ))}
+        </div>
+      )}
+
+      {picks.length > 0 && (
+        <Section
+          title={activeMood ? `${activeMood.label} picks` : 'Quick Picks'}
+          action={activeMood && (
+            <button className="press flex h-8 items-center gap-1 rounded-full bg-s2 px-3 text-footnote font-semibold" onClick={() => playList(picks, 0)}><PlayIcon size={14} /> Play</button>
+          )}
+        >
+          <Shelf>{picks.map((t, i) => <QuickPickCard key={t.id} track={t} onPlay={() => (activeMood ? playList(picks, i) : playFromAll(t.id))} />)}</Shelf>
         </Section>
       )}
+
+      {data.listening.length > 0 && (
+        <Section title="Keep listening">
+          <div>{data.listening.map((t) => <ListenRow key={t.id} track={t} onPlay={() => playFromAll(t.id)} />)}</div>
+        </Section>
+      )}
+
+      {data.recentAlbums.length > 0 && (
+        <Section title="Recently played" to="/library/albums">
+          <Shelf>{data.recentAlbums.map((g) => <GroupCard key={g.key} group={g} base="/library/albums" />)}</Shelf>
+        </Section>
+      )}
+
       {data.favorites.length > 0 && (
         <Section title="Favorites" to="/library/favorites">
-          <Shelf>{data.favorites.map((t) => <TrackCard key={t.id} track={t} onPlay={() => playFrom(data.ids.indexOf(t.id))} />)}</Shelf>
+          <Shelf>{data.favorites.map((t) => <TrackCard key={t.id} track={t} onPlay={() => playFromAll(t.id)} />)}</Shelf>
         </Section>
       )}
-      <Section title="Albums" to="/library/albums">
-        <Shelf>{data.albums.map((g) => <GroupCard key={g.key} group={g} base="/library/albums" />)}</Shelf>
-      </Section>
-      <Section title="Recently added" to="/library/songs">
-        <div>{data.added.map((t) => <TrackRow key={t.id} track={t} onPlay={() => playFrom(data.ids.indexOf(t.id))} />)}</div>
-        {tracks.length > data.added.length && (
-          <Link to="/library/songs" className="press mt-1 block px-gutter py-2 text-footnote font-semibold text-accent-text">See all {tracks.length} songs</Link>
-        )}
-      </Section>
+
+      {data.albums.length > 0 && (
+        <Section title="Albums" to="/library/albums">
+          <Shelf>{data.albums.map((g) => <GroupCard key={g.key} group={g} base="/library/albums" />)}</Shelf>
+        </Section>
+      )}
+
+      {tracks && tracks.length === 0 && <ExamplePreview />}
     </div>
+  );
+}
+
+/** Compact welcome card for an empty library. */
+function Welcome() {
+  return (
+    <section className="mx-gutter mb-6 rounded-xl bg-s2 p-4" aria-labelledby="welcome-title">
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-s3"><CadenceMark size={26} /></div>
+        <div className="min-w-0">
+          <h1 id="welcome-title" className="text-body-lg font-semibold">Welcome to Cadence</h1>
+          <p className="text-footnote text-fg-2">Your music, on your iPhone. Plays offline.</p>
+        </div>
+      </div>
+      <p className="mt-3 text-footnote text-fg-2">Import songs from the Files app. They stay on this device and are never uploaded.</p>
+      <ImportButton variant="compact" label="Import music" className="mt-3 w-full" />
+    </section>
   );
 }

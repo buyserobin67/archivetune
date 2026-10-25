@@ -1,6 +1,6 @@
 import { db as defaultDb, type CadenceDB } from './db';
 import { isQuotaError, StorageQuotaError } from './errors';
-import type { Playlist, Track } from './types';
+import type { Lyrics, Playlist, Track } from './types';
 
 /**
  * Backup container (".cadence"):
@@ -17,6 +17,8 @@ interface Manifest {
   includesAudio: boolean;
   tracks: { track: Track; audio?: BlobRef; art?: BlobRef }[];
   playlists: Playlist[];
+  /** Optional: backups made before lyrics existed have no such field. */
+  lyrics?: Lyrics[];
 }
 
 export async function exportLibrary(opts: { includeAudio: boolean; db?: CadenceDB }): Promise<Blob> {
@@ -42,7 +44,8 @@ export async function exportLibrary(opts: { includeAudio: boolean; db?: CadenceD
     if (art) e.art = push(art.blob);
     entries.push(e);
   }
-  const manifest: Manifest = { version: 1, exportedAt: Date.now(), includesAudio: opts.includeAudio, tracks: entries, playlists };
+  const lyrics = await d.lyrics.toArray();
+  const manifest: Manifest = { version: 1, exportedAt: Date.now(), includesAudio: opts.includeAudio, tracks: entries, playlists, lyrics };
   const json = new TextEncoder().encode(JSON.stringify(manifest));
   const len = new Uint8Array(4);
   new DataView(len.buffer).setUint32(0, json.length);
@@ -92,6 +95,11 @@ export async function importBackup(file: Blob, opts: { db?: CadenceDB } = {}): P
     );
     if (!e.audio) summary.audioMissing++;
     summary.tracksAdded++;
+  }
+
+  for (const l of manifest.lyrics ?? []) {
+    const id = idMap.get(l.trackId);
+    if (id && !(await d.lyrics.get(id))) await d.lyrics.put({ ...l, trackId: id });
   }
 
   for (const p of manifest.playlists) {

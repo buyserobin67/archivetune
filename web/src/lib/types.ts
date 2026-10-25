@@ -28,6 +28,8 @@ export interface Track {
   lastPlayedAt: number;
   playCount: number;
   license?: LicenseInfo;
+  /** First genre tag, '' when the file has none. undefined = tags not scanned yet (see backfill.ts). */
+  genre?: string;
 }
 
 export interface TrackBlob {
@@ -55,7 +57,24 @@ export interface Setting {
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
+export interface LyricLine {
+  /** Seconds from the start of the track. */
+  t: number;
+  text: string;
+}
+
+/** Lyrics supplied by the user: embedded in the file, an LRC/TXT sidecar, or pasted. Never fetched from a server. */
+export interface Lyrics {
+  trackId: string;
+  kind: 'synced' | 'plain';
+  lines?: LyricLine[];
+  text?: string;
+  source: 'embedded' | 'lrc' | 'manual';
+}
+
 export interface ParsedMeta {
+  genre?: string;
+  lyrics?: Omit<Lyrics, 'trackId'>;
   title?: string;
   artist?: string;
   album?: string;

@@ -38,3 +38,10 @@ export const CheckIcon = (p: P) => stroke(<path d="m5 12 5 5 9-10" />, p);
 export const FilterIcon = (p: P) => stroke(<path d="M3 5h18l-7 8v6l-4 2v-8z" />, p);
 export const ListIcon = (p: P) => stroke(<><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3.5 6h.01" /><path d="M3.5 12h.01" /><path d="M3.5 18h.01" /></>, p);
 export const MicIcon = (p: P) => stroke(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></>, p);
+export const MoonIcon = (p: P) => stroke(<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" />, p);
+export const QuoteIcon = (p: P) => stroke(<><path d="M4 5h16" /><path d="M4 10h10" /><path d="M4 15h16" /><path d="M4 20h9" /></>, p);
+export const CadenceMark = ({ size = 24, className }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <g fill="currentColor">{[[3, 9], [7.5, 15], [12, 20], [16.5, 12], [21, 7]].map(([x, h], i) => <rect key={i} x={x - 1.4} y={12 - h / 2} width="2.8" height={h} rx="1.4" />)}</g>
+  </svg>
+);

@@ -23,7 +23,7 @@ function Hero({ back, trackId, seed, title, meta, round, children, collage }: {
   return (
     <div className="relative">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[30rem]" aria-hidden="true"
-        style={{ background: `radial-gradient(110% 70% at 50% 0%, rgb(${rgbCss(palette.accent)} / .5), transparent 72%), linear-gradient(to bottom, rgb(${rgbCss(palette.tint)} / .5), transparent 85%)` }} />
+        style={{ background: `radial-gradient(110% 70% at 50% 0%, rgb(${rgbCss(palette.accent)} / .26), transparent 72%), linear-gradient(to bottom, rgb(${rgbCss(palette.tint)} / .45), transparent 85%)` }} />
       <BackBar to={back} />
       <div className="relative flex flex-col items-center px-gutter pb-5 pt-3 text-center">
         <div className={`aspect-square w-[min(12rem,55vw)] overflow-hidden shadow-art ${round ? 'rounded-full' : 'rounded-xl'}`}>

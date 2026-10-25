@@ -1,5 +1,6 @@
 import { db as defaultDb, newId, type CadenceDB } from './db';
 import { isQuotaError, StorageQuotaError } from './errors';
+import { attachSidecars, isLyricFile } from './lyrics';
 import { sha256Hex } from './hash';
 import { guessMime, looksLikeAudio, parseTags, titleFromFileName, type MetaParser } from './metadata';
 import type { LicenseInfo, Track } from './types';
@@ -22,6 +23,8 @@ export interface ImportSummary {
   failed: { name: string; error: string }[];
   /** Set when the import stopped early because storage ran out. */
   quotaExceeded: boolean;
+  lyricsAttached: number;
+  lyricsUnmatched: string[];
 }
 
 /** Imports one file. Writes track + audio + artwork in a single transaction: all or nothing. */
@@ -54,14 +57,16 @@ export async function importFile(file: File | Blob, name: string, opts: ImportOp
     lastPlayedAt: 0,
     playCount: 0,
     license: opts.license,
+    genre: meta.genre ?? '',
   };
   // Normalise the stored type so Safari picks the right decoder.
   const audio = file.type === track.mime ? file : file.slice(0, file.size, track.mime);
 
   try {
-    await d.transaction('rw', d.tracks, d.blobs, d.art, async () => {
+    await d.transaction('rw', [d.tracks, d.blobs, d.art, d.lyrics], async () => {
       await d.blobs.put({ trackId: id, blob: audio });
       if (meta.art) await d.art.put({ trackId: id, blob: meta.art });
+      if (meta.lyrics) await d.lyrics.put({ trackId: id, ...meta.lyrics });
       await d.tracks.put(track);
     });
   } catch (e) {
@@ -73,7 +78,10 @@ export async function importFile(file: File | Blob, name: string, opts: ImportOp
 
 /** Imports many files sequentially (keeps memory flat on phones). Stops cleanly on quota errors. */
 export async function importFiles(files: File[], opts: ImportOptions = {}): Promise<ImportSummary> {
-  const summary: ImportSummary = { added: [], duplicates: [], failed: [], quotaExceeded: false };
+  const summary: ImportSummary = { added: [], duplicates: [], failed: [], quotaExceeded: false, lyricsAttached: 0, lyricsUnmatched: [] };
+  // .lrc / .txt files picked together with audio are lyric sidecars, matched by file name afterwards.
+  const sidecars = files.filter((f) => isLyricFile(f.name));
+  files = files.filter((f) => !isLyricFile(f.name));
   let done = 0;
   for (const file of files) {
     opts.onProgress?.(done, files.length, file.name);
@@ -93,12 +101,19 @@ export async function importFiles(files: File[], opts: ImportOptions = {}): Prom
     done++;
   }
   opts.onProgress?.(files.length, files.length, '');
+  if (sidecars.length) {
+    const d = opts.db ?? defaultDb;
+    const r = await attachSidecars(sidecars, await d.tracks.toArray(), d);
+    summary.lyricsAttached = r.attached;
+    summary.lyricsUnmatched = r.unmatched;
+  }
   return summary;
 }
 
 export async function deleteTrack(id: string, d: CadenceDB = defaultDb): Promise<void> {
-  await d.transaction('rw', [d.tracks, d.blobs, d.art, d.playlists], async () => {
+  await d.transaction('rw', [d.tracks, d.blobs, d.art, d.playlists, d.lyrics], async () => {
     await d.tracks.delete(id);
+    await d.lyrics.delete(id);
     await d.blobs.delete(id);
     await d.art.delete(id);
     const lists = await d.playlists.toArray();

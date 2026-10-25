@@ -1,3 +1,4 @@
+import { parseLrc, toLyrics } from './lrc';
 import type { ParsedMeta } from './types';
 
 export type MetaParser = (file: Blob, fileName: string) => Promise<ParsedMeta>;
@@ -8,7 +9,10 @@ export const parseTags: MetaParser = async (file) => {
     const { parseBlob, selectCover } = await import('music-metadata');
     const m = await parseBlob(file, { skipPostHeaders: true });
     const pic = selectCover(m.common.picture);
+    const lyrics = embeddedLyrics(m.common.lyrics);
     return {
+      genre: m.common.genre?.[0]?.trim() ?? '',
+      lyrics,
       title: m.common.title,
       artist: m.common.artist ?? m.common.albumartist,
       album: m.common.album,
@@ -20,6 +24,25 @@ export const parseTags: MetaParser = async (file) => {
     return {};
   }
 };
+
+type EmbeddedLyrics = { text?: string; syncText?: { text: string; timestamp?: number }[]; timeStampFormat?: number }[];
+
+/** Prefers millisecond-synced lyrics (ID3 SYLT), then LRC-looking text, then plain text. Nothing is fetched. */
+function embeddedLyrics(tags: EmbeddedLyrics | undefined): ParsedMeta['lyrics'] {
+  for (const l of tags ?? []) {
+    const synced = (l.syncText ?? []).filter((s) => typeof s.timestamp === 'number');
+    if (l.timeStampFormat === 2 && synced.length) {
+      const lines = synced.map((s) => ({ t: (s.timestamp as number) / 1000, text: s.text.replace(/\s+/g, ' ').trim() })).sort((a, b) => a.t - b.t);
+      return { kind: 'synced', lines, source: 'embedded' };
+    }
+  }
+  for (const l of tags ?? []) {
+    if (!l.text?.trim()) continue;
+    const parsed = toLyrics('', parseLrc(l.text), 'embedded');
+    if (parsed) { const { trackId: _t, ...rest } = parsed; return rest; }
+  }
+  return undefined;
+}
 
 /** Fallback title from a file name: "01 - Song_Name.mp3" -> "Song Name". */
 export function titleFromFileName(name: string): string {

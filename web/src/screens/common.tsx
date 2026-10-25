@@ -5,12 +5,20 @@ import { ChevronLeft, SearchIcon, CloseIcon } from '../components/Icons';
 import { ImportButton } from '../components/ImportButton';
 
 /** Top-of-screen title row. Respects the Dynamic Island / status bar via --sat. */
-export function ScreenHeader({ title, eyebrow, actions }: { title: string; eyebrow?: string; actions?: ReactNode }) {
+export function ScreenHeader({ title, eyebrow, actions, back }: { title: string; eyebrow?: string; actions?: ReactNode; back?: string }) {
+  const nav = useNavigate();
   return (
-    <header className="flex items-end justify-between gap-3 px-gutter pb-5" style={{ paddingTop: 'calc(var(--sat) + 0.75rem)' }}>
-      <div className="min-w-0">
-        {eyebrow && <div className="eyebrow mb-0.5 truncate">{eyebrow}</div>}
-        <h1 className="line-clamp-2 break-words text-title-lg font-extrabold">{title}</h1>
+    <header className="flex items-end justify-between gap-3 px-gutter pb-3" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)' }}>
+      <div className="flex min-w-0 items-center gap-2">
+        {back && (
+          <button className="press -ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-s2" aria-label="Back" onClick={() => (window.history.length > 1 ? nav(-1) : nav(back))}>
+            <ChevronLeft size={22} />
+          </button>
+        )}
+        <div className="min-w-0">
+          {eyebrow && <div className="eyebrow mb-0.5 truncate">{eyebrow}</div>}
+          <h1 className="line-clamp-2 break-words text-title-lg font-extrabold">{title}</h1>
+        </div>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
@@ -19,7 +27,7 @@ export function ScreenHeader({ title, eyebrow, actions }: { title: string; eyebr
 
 export function RoundButton({ label, onClick, children, tone = 'surface' }: { label: string; onClick: () => void; children: ReactNode; tone?: 'surface' | 'accent' }) {
   return (
-    <button className={`press flex h-10 w-10 items-center justify-center rounded-full ${tone === 'accent' ? 'bg-accent text-black' : 'bg-s3 text-fg'}`} onClick={onClick} aria-label={label}>{children}</button>
+    <button className={`press flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone === 'accent' ? 'bg-accent text-black' : 'bg-s2 text-fg'}`} onClick={onClick} aria-label={label}>{children}</button>
   );
 }
 
@@ -35,13 +43,16 @@ export function BackBar({ to, right }: { to: string; right?: ReactNode }) {
   );
 }
 
+/** Compact, intentional empty state: small cover tile, short copy, one button. No giant illustration. */
 export function EmptyState({ title, body, showImport = true }: { title: string; body: string; showImport?: boolean }) {
   return (
-    <div className="page-enter flex flex-col items-center px-8 py-14 text-center">
-      <div className="relative mb-6 h-36 w-36 overflow-hidden rounded-xl shadow-art"><FallbackCover seed={title} /></div>
-      <h2 className="text-title font-bold">{title}</h2>
-      <p className="mb-6 mt-2 max-w-xs text-body text-fg-2">{body}</p>
-      {showImport && <ImportButton />}
+    <div className="page-enter mx-gutter flex items-center gap-4 rounded-xl bg-s2 p-4">
+      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg"><FallbackCover seed={title} /></div>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-body-lg font-semibold">{title}</h2>
+        <p className="mt-0.5 text-footnote text-fg-2">{body}</p>
+        {showImport && <ImportButton className="mt-3" variant="compact" />}
+      </div>
     </div>
   );
 }

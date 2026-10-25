@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 
 interface UIState {
   playerOpen: boolean;
-  playerTab: 'now' | 'queue';
+  playerTab: 'now' | 'queue' | 'lyrics';
   toast: { id: number; text: string } | null;
   sheetTrackId: string | null;
   pickerTrackIds: string[] | null;

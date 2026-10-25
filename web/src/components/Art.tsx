@@ -31,21 +31,19 @@ export function Art({ trackId, seed = '', className = '', rounded = 'rounded-lg'
   );
 }
 
-/** Generated cover for tracks without artwork: seeded gradient, soft orbs, a quiet waveform glyph. */
+/** Generated cover for tracks without artwork: charcoal with a faint tint from the title seed and a quiet waveform glyph. */
 export function FallbackCover({ seed }: { seed: string }) {
   const p = useMemo(() => seedPalette(seed || 'cadence'), [seed]);
-  const a = rgbCss(p.accent), b = rgbCss(p.accent2), t = rgbCss(p.tint);
+  const a = rgbCss(p.accent), t = rgbCss(p.tint);
   return (
     <div
       className="absolute inset-0"
-      style={{
-        background: `radial-gradient(90% 90% at 18% 12%, rgb(${a} / .75), transparent 60%), radial-gradient(80% 80% at 88% 92%, rgb(${b} / .85), transparent 62%), linear-gradient(160deg, rgb(${t}), #0a0a10)`,
-      }}
+      style={{ background: `radial-gradient(120% 100% at 15% 0%, rgb(${a} / .30), transparent 62%), linear-gradient(160deg, rgb(${t} / .9), #1b1d20)` }}
     >
       <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden="true">
-        <g fill="rgb(255 255 255 / .82)">
+        <g fill="rgb(245 245 245 / .55)">
           {[22, 40, 58, 36, 50, 28].map((h, i) => (
-            <rect key={i} x={23 + i * 9} y={50 - h / 2} width="4.6" height={h} rx="2.3" opacity={0.55 + (i % 3) * 0.18} />
+            <rect key={i} x={23 + i * 9} y={50 - h / 2} width="4.6" height={h} rx="2.3" opacity={0.5 + (i % 3) * 0.2} />
           ))}
         </g>
       </svg>
