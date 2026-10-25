@@ -1,5 +1,4 @@
-// Home Screen app with a viewport shorter than the screen: the app must stretch to the screen and keep the home indicator clear.
-// Safari tabs and correct viewports must not change. Chromium emulation of the iOS numbers (the real device is not available here).
+// Home Screen app whose window is shorter than the screen: the tab bar must stay fully visible and nothing is stretched past the window. Chromium emulation of the iOS numbers (the real device is not available here).
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 
@@ -38,17 +37,17 @@ async function scenario(name, { standalone, gap, insetBottom }) {
   return m;
 }
 
-const bug = await scenario('Home Screen app, viewport 62pt short, inset reported 0', { standalone: true, gap: 62, insetBottom: 0 });
-check(bug.fill === '874' && bug.rootH === 874, 'app stretches to the full screen height');
-// 28 = the normal floating-dock offset (0.6 x 34pt inset + 8): the same distance a correct viewport gets
-check(874 - bug.ulBottom === 28, `tab bar sits exactly where a correct viewport puts it, above the home indicator (${874 - bug.ulBottom}px from the screen bottom)`);
-check(bug.mainPad <= bug.dockH + 8 + 1, `scroll padding is trimmed to the dock plus 0.5rem (${bug.mainPad} vs dock ${bug.dockH})`);
+// iOS never draws below the web view, so the page must NOT be stretched past it: the tab bar has to stay fully inside the window.
+const bug = await scenario('Home Screen app, window 62pt shorter than the screen, inset reported 0', { standalone: true, gap: 62, insetBottom: 0 });
+check(bug.fill === null && bug.rootH === bug.inner, 'the app is not stretched past the window (that would clip the tab bar)', JSON.stringify(bug));
+check(bug.ulBottom <= bug.inner, `the whole tab bar is inside the visible window (bottom ${bug.ulBottom} of ${bug.inner})`);
+check(bug.mainPad <= bug.dockH + 8 + 1, `scroll padding is the dock plus 0.5rem (${bug.mainPad} vs dock ${bug.dockH})`);
 
-const bug2 = await scenario('Home Screen app, viewport 62pt short, inset reported 34', { standalone: true, gap: 62, insetBottom: 34 });
-check(bug2.rootH === 874 && 874 - bug2.ulBottom === 28, 'with a correct inset the dock is in the same place (inset not double-counted)', JSON.stringify(bug2));
+const bug2 = await scenario('Home Screen app, window 62pt shorter, inset reported 34', { standalone: true, gap: 62, insetBottom: 34 });
+check(bug2.fill === null && bug2.ulBottom <= bug2.inner, 'same with a reported inset', JSON.stringify(bug2));
 
 const ok = await scenario('Home Screen app, correct full viewport', { standalone: true, gap: 0, insetBottom: 34 });
-check(ok.fill === null && ok.rootH === ok.inner, 'nothing changes when the viewport already matches the screen');
+check(ok.fill === null && ok.rootH === ok.inner && ok.ulBottom <= ok.inner, 'a correct viewport is unchanged');
 
 const safari = await scenario('Safari tab, shorter viewport (browser chrome)', { standalone: false, gap: 100, insetBottom: 34 });
 check(safari.fill === null && safari.rootH === safari.inner, 'Safari layout is untouched');

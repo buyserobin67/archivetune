@@ -52,7 +52,7 @@ function serviceWorkerManifest(): Plugin {
     closeBundle() {
       const files = walk(outDir)
         .map((f) => relative(outDir, f).split(sep).join('/'))
-        .filter((f) => f !== 'sw.js' && f !== '404.html' && !f.endsWith('.map'));
+        .filter((f) => f !== 'sw.js' && f !== '404.html' && !f.endsWith('.map') && !f.startsWith('splash/'));
       const hash = createHash('sha256');
       for (const f of files.sort()) hash.update(f).update(readFileSync(join(outDir, f)));
       const version = hash.digest('hex').slice(0, 12);

@@ -2,7 +2,7 @@ name: Cadence Web (build, test, deploy to GitHub Pages)
 
 on:
   push:
-    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, claude/cadence-web-features, claude/cadence-web-standalone-fix, main]
+    branches: [claude/cadence-web-mvp, claude/cadence-web-redesign, claude/cadence-web-compact-ui, claude/cadence-web-iphone-fixes, claude/cadence-web-persistence, claude/cadence-web-lyrics, claude/cadence-web-features, claude/cadence-web-standalone-fix, claude/cadence-web-standalone-hotfix, main]
     paths: ["web/**", ".github/workflows/web-pages.yml"]
   pull_request:
     paths: ["web/**", ".github/workflows/web-pages.yml"]
@@ -60,8 +60,8 @@ jobs:
         env:
           E2E_BASE: /${{ github.event.repository.name }}/
 
-      # Home Screen app with a viewport shorter than the screen: no empty band under the tab bar (emulated numbers).
-      - name: Fill-screen in the Home Screen app
+      # Home Screen app with a viewport shorter than the screen: tab bar stays fully inside the window (emulated numbers).
+      - name: Short Home Screen window keeps the tab bar visible
         run: npm run e2e:fill
         env:
           E2E_BASE: /${{ github.event.repository.name }}/

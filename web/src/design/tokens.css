@@ -53,8 +53,6 @@
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
 }
-/* Home Screen app stretched to the screen (see useFillScreen): never less than the home-indicator inset. */
-:root[data-fill] { --sab: var(--sab-fill, env(safe-area-inset-bottom, 0px)); }
 
 @media (prefers-reduced-motion: reduce) {
   :root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
