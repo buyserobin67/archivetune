@@ -1,6 +1,12 @@
 /* Cadence service worker: precaches the app shell so the UI loads offline.
- * Audio lives in IndexedDB, not here. The two placeholders below are replaced
- * at build time by vite.config.ts. */
+ * Audio and the library live in IndexedDB, never here, and this worker never touches IndexedDB.
+ * The two placeholders below are replaced at build time by vite.config.ts.
+ *
+ * Update rules (see docs/UPDATES_AND_DATA.md):
+ *  - A new version installs in the background and WAITS. It is only activated when the app asks (the
+ *    "Restart to update" button sends SKIP_WAITING), so a running page never loses the files it is using.
+ *  - On activation only OLD shell caches (cadence-shell-*) are removed. Nothing else is deleted, and the
+ *    worker is never unregistered. */
 const VERSION = '__SW_VERSION__';
 const CACHE = 'cadence-shell-' + VERSION;
 const FILES = __PRECACHE_FILES__;
@@ -11,9 +17,15 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll([scopeUrl('./'), ...FILES.map(scopeUrl)]))
-      .then(() => self.skipWaiting()),
+      .then((cache) => cache.addAll([scopeUrl('./'), ...FILES.map(scopeUrl)])),
+    // No skipWaiting here: an updated worker waits until the user chooses to restart.
   );
+});
+
+self.addEventListener('message', (event) => {
+  const type = event.data && event.data.type;
+  if (type === 'SKIP_WAITING') self.skipWaiting();
+  if (type === 'GET_VERSION' && event.ports && event.ports[0]) event.ports[0].postMessage({ version: VERSION });
 });
 
 self.addEventListener('activate', (event) => {

@@ -44,6 +44,8 @@ function boot(version = 'v1', network: Record<string, string> = {}, store = new 
     skipWaiting: async () => {},
     clients: { claim: async () => {} },
   };
+  const skipped = { count: 0 };
+  self.skipWaiting = async () => { skipped.count++; };
   const src = readFileSync('public/sw.js', 'utf8').replace('__SW_VERSION__', version).replace('__PRECACHE_FILES__', JSON.stringify(FILES));
   vm.runInNewContext(src, {
     self, caches: { open: async (n: string) => makeCache(n), keys: async () => [...store.keys()], delete: async (n: string) => store.delete(n) },
@@ -58,7 +60,8 @@ function boot(version = 'v1', network: Record<string, string> = {}, store = new 
   };
   const request = (path: string, init: Partial<{ method: string; mode: string }> = {}) => ({ url: path.startsWith('http') ? path : SCOPE + path, method: init.method ?? 'GET', mode: init.mode ?? 'cors' });
   return {
-    store, fetchLog, handlers,
+    store, fetchLog, handlers, skipped,
+    message: (data: any, ports: any[] = []) => handlers.message({ data, ports }),
     setOnline: (v: boolean) => { online = v; },
     install: () => run('install', {}),
     activate: () => run('activate', {}),
@@ -116,6 +119,34 @@ describe('service worker caching', () => {
     await next.install();
     await next.activate();
     expect([...store.keys()]).toEqual(['cadence-shell-new']);
+  });
+
+  it('a new version waits: install never skips waiting, only the Restart message does', async () => {
+    const sw = boot('v2', network);
+    await sw.install();
+    expect(sw.skipped.count).toBe(0);
+    sw.message({ type: 'SKIP_WAITING' });
+    expect(sw.skipped.count).toBe(1);
+    sw.message({ type: 'something-else' });
+    expect(sw.skipped.count).toBe(1);
+  });
+
+  it('reports its version over a MessagePort', () => {
+    const sw = boot('v7', network);
+    const got: any[] = [];
+    sw.message({ type: 'GET_VERSION' }, [{ postMessage: (m: any) => got.push(m) }]);
+    expect(got).toEqual([{ version: 'v7' }]);
+  });
+
+  it('activating a new version removes only old cadence-shell caches, never other storage', async () => {
+    const store = new Map<string, Map<string, Response>>();
+    store.set('user-data-cache', new Map([['k', new Response('keep')]]));
+    const old = boot('old', network, store);
+    await old.install();
+    const next = boot('new', network, store);
+    await next.install();
+    await next.activate();
+    expect([...store.keys()].sort()).toEqual(['cadence-shell-new', 'user-data-cache']);
   });
 
   it('install fails (and the old worker stays) if a shell file cannot be fetched', async () => {

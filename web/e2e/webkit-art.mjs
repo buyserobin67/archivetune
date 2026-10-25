@@ -22,6 +22,7 @@ try {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(URL);
   await page.waitForSelector('text=Welcome to Cadence');
   await page.setInputFiles('input[type=file] >> nth=0', ['art-pillarbox', 'art-landscape', 'art-letterbox', 'art-portrait', 'art-transparent'].map((n) => `${FX}/${n}.mp3`));
@@ -52,7 +53,11 @@ try {
   };
 
   await page.goto(`${URL}#/library/albums`);
-  await page.waitForSelector('text=Art Test E');
+  await page.waitForSelector('text=Art Test E', { timeout: 15000 }).catch(async (e) => {
+    console.log('albums page did not show the imported album. errors:', JSON.stringify(errors.slice(0, 5)));
+    console.log('page text:', (await page.evaluate(() => document.body.innerText)).slice(0, 600));
+    throw e;
+  });
   await page.waitForTimeout(1500);
   const pct = (v) => `${Math.round(v * 100)}% bars`;
   const a = await bgShare('Art Test A'), b = await bgShare('Art Test B'), d = await bgShare('Art Test D'), e = await bgShare('Art Test E'), c = await bgShare('Art Test C');

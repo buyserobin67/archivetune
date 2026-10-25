@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
@@ -14,6 +15,19 @@ function normalizeBase(b: string): string {
   if (!b.startsWith('/')) b = '/' + b;
   return b.endsWith('/') ? b : b + '/';
 }
+
+/** Version stamp shown in Settings. `VITE_APP_BUILD` overrides it (used by the upgrade tests to fake a new deploy). */
+function buildId(): string {
+  const env = process.env.VITE_APP_BUILD || process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA;
+  if (env) return env.slice(0, 9);
+  try { return execSync('git rev-parse --short=9 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'dev'; }
+}
+const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+export const appDefines = {
+  __APP_VERSION__: JSON.stringify(pkg.version),
+  __APP_BUILD__: JSON.stringify(buildId()),
+  __APP_BUILT_AT__: JSON.stringify(new Date().toISOString()),
+};
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -54,6 +68,7 @@ function serviceWorkerManifest(): Plugin {
 
 export default defineConfig({
   base,
+  define: appDefines,
   plugins: [react(), serviceWorkerManifest()],
   build: { target: 'es2022', sourcemap: false },
 });

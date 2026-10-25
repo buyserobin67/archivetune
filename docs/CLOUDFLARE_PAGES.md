@@ -33,7 +33,9 @@ Routing uses `/#/…`, so refresh and deep links work with no redirect rules. Th
 
 ## Updating
 
-Every push to `claude/cadence-web-redesign` triggers a new build and deploy automatically. On the phone, fully close Cadence (app switcher, swipe up) and open it twice so the new service worker takes over.
+Keep **one** production URL and one production branch for good; see `docs/UPDATES_AND_DATA.md` for the release process and why other URLs have separate libraries. Every push to the production branch deploys to that same URL. Installed apps then show **"New Cadence version available — Restart to update."**; tap Restart. Your imported music stays.
+
+Warning: preview URLs (`<branch>.<project>.pages.dev`) are different origins with separate, empty libraries, and Safari and the Home Screen app also keep separate libraries. Only import music in the Home Screen app opened from the production URL.
 
 ## Privacy and what is deployed
 
@@ -64,7 +66,7 @@ Production stays on the branch you set during setup. Changing it is a deliberate
 | Build fails: `Could not read package.json` | Root directory must be `web` |
 | Build fails on Node version | Add env var `NODE_VERSION` = `22` |
 | Blank page, 404 for `/archivetune/assets/...` | `VITE_BASE` is set in Cloudflare; delete it and redeploy |
-| Old UI after an update | Close the app fully and reopen twice; or delete and re-add the Home Screen icon (this keeps nothing: export a backup first) |
+| Old UI after an update | Settings → About & data → Check for updates, then tap Restart. Do **not** delete the Home Screen icon: that erases the library for that app (export a backup first) |
 | `pages.dev` name already taken | Choose a different project name |
 
 ## What was tested

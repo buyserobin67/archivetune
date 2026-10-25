@@ -1,28 +1,17 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
-import App from './App';
-import { backfillTags } from './lib/backfill';
-import { autoTrimAll, browserArtProcessor } from './lib/artEdits';
+import { Boot } from './Boot';
 import { getPlayer } from './lib/player';
-import { registerServiceWorker } from './lib/pwa';
-import { requestPersistence } from './lib/storage';
 import './index.css';
 
-// Create the one audio element up front, outside React, then restore the last queue (paused).
-const player = getPlayer();
-void player.restore().catch(() => {});
-void requestPersistence();
-// Read genre / embedded-lyric tags for tracks imported before those existed (background, a few at a time).
-setTimeout(() => void backfillTags().catch(() => {}), 3000);
-// Trim transparent borders off covers that were imported before this existed (originals are kept; undo in Settings).
-setTimeout(() => void autoTrimAll(browserArtProcessor).catch(() => {}), 6000);
-registerServiceWorker();
+// Create the one audio element up front, outside React. Everything that needs the library starts after it has opened (Boot).
+getPlayer();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HashRouter>
-      <App />
+      <Boot />
     </HashRouter>
   </StrictMode>,
 );

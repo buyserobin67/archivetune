@@ -2,12 +2,14 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { exportLibrary, importBackup } from '../lib/backup';
 import { StorageQuotaError } from '../lib/errors';
+import { APP_VERSION } from '../lib/appInfo';
 import { isStandalone } from '../lib/pwa';
 import { formatBytes, requestPersistence } from '../lib/storage';
 import { useStorageStatus, useTracks } from '../lib/hooks';
 import { ui } from '../lib/ui';
 import { ImportButton } from '../components/ImportButton';
 import { ChevronRight } from '../components/Icons';
+import { AboutData } from '../components/AboutData';
 import { DisplayDiagnostics } from '../components/DisplayDiagnostics';
 import { ArtworkDiagnostics } from '../components/ArtworkDiagnostics';
 import { ScreenHeader } from './common';
@@ -105,6 +107,8 @@ export default function Settings() {
         {busy && <p className="mt-3 text-footnote text-accent-text" role="status">Working…</p>}
       </Group>
 
+      <AboutData />
+
       <ArtworkDiagnostics />
 
       <DisplayDiagnostics />
@@ -120,7 +124,7 @@ export default function Settings() {
         </ul>
       </Group>
 
-      <p className="px-gutter pb-4 text-center text-caption text-fg-3">Cadence Web · music stays on your device · no analytics, no accounts</p>
+      <p className="px-gutter pb-4 text-center text-caption text-fg-3">Cadence Web {APP_VERSION} · music stays on your device · no analytics, no accounts</p>
     </div>
   );
 }

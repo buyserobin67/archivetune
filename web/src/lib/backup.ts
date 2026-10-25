@@ -1,4 +1,5 @@
-import { db as defaultDb, type CadenceDB } from './db';
+import { APP_VERSION } from './appInfo';
+import { db as defaultDb, SCHEMA_VERSION, type CadenceDB } from './db';
 import { isQuotaError, StorageQuotaError } from './errors';
 import type { Lyrics, Playlist, Track } from './types';
 
@@ -19,6 +20,8 @@ interface Manifest {
   playlists: Playlist[];
   /** Optional: backups made before lyrics existed have no such field. */
   lyrics?: Lyrics[];
+  /** Optional: which app and database version wrote this file (absent in older backups; readers must not require it). */
+  app?: { version: string; schema: number };
 }
 
 export async function exportLibrary(opts: { includeAudio: boolean; db?: CadenceDB }): Promise<Blob> {
@@ -45,7 +48,7 @@ export async function exportLibrary(opts: { includeAudio: boolean; db?: CadenceD
     entries.push(e);
   }
   const lyrics = await d.lyrics.toArray();
-  const manifest: Manifest = { version: 1, exportedAt: Date.now(), includesAudio: opts.includeAudio, tracks: entries, playlists, lyrics };
+  const manifest: Manifest = { version: 1, exportedAt: Date.now(), includesAudio: opts.includeAudio, tracks: entries, playlists, lyrics, app: { version: APP_VERSION, schema: SCHEMA_VERSION } };
   const json = new TextEncoder().encode(JSON.stringify(manifest));
   const len = new Uint8Array(4);
   new DataView(len.buffer).setUint32(0, json.length);

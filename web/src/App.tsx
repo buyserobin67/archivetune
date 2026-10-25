@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { Dock } from './components/Dock';
+import { UpdateBanner } from './components/UpdateBanner';
 import { NowPlaying } from './components/NowPlaying';
 import { PlaylistPicker, TrackSheet } from './components/Sheets';
 import Home from './screens/Home';
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="*" element={<Home />} />
         </Routes>
       </main>
+      <UpdateBanner />
       <Dock />
       <NowPlaying />
       <TrackSheet />
