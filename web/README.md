@@ -11,6 +11,7 @@ npm run e2e        # browser E2E at iPhone viewports (needs a build with VITE_BA
 ```
 
 Production builds for GitHub Pages need the repo subpath: `VITE_BASE=/<repo>/ npm run build && node scripts/verify-dist.mjs /<repo>/`.
+Cloudflare Pages (free, works with a private repo) builds from `web/` with the default base `/`: see [../docs/CLOUDFLARE_PAGES.md](../docs/CLOUDFLARE_PAGES.md).
 CI does this automatically (`.github/workflows/web-pages.yml`). See [../docs/WEB_INSTALL.md](../docs/WEB_INSTALL.md) for iPhone install steps and limitations.
 
 ## Layout

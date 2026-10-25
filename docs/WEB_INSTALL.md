@@ -4,7 +4,9 @@ Cadence Web is a Home Screen web app. It needs no Apple Developer account, no Ma
 
 **URL (after the first successful deploy):** `https://buyserobin67.github.io/archivetune/`
 
-## One-time setup (done in the GitHub app or github.com on your phone)
+> **Private repo and don't want to pay for GitHub Pages?** Use Cloudflare Pages instead: see [CLOUDFLARE_PAGES.md](CLOUDFLARE_PAGES.md).
+
+## One-time setup for GitHub Pages (done in the GitHub app or github.com on your phone)
 
 1. Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. Repo → **Settings → Environments → github-pages → Deployment branches**: allow `claude/cadence-web-mvp` (or merge the branch into your default branch). If this is not allowed, the deploy job fails with "Branch is not allowed to deploy".
