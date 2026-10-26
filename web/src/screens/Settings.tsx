@@ -20,6 +20,7 @@ import { canSetVolume, LEVELLING_KEY, readLevelling, type Levelling } from '../l
 import { getPlayer } from '../lib/player';
 import { haptic, HAPTICS_KEY, hapticsOn } from '../lib/haptics';
 import { CLEAN_NAMES_KEY, cleanNamesOn } from '../lib/names';
+import { PATTERNS_KEY, patternsOn } from '../lib/patternsPref';
 
 const SWITCH = 'h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-s3 transition-colors checked:bg-fg [&::before]:block [&::before]:h-5 [&::before]:w-5 [&::before]:translate-x-0.5 [&::before]:translate-y-0.5 [&::before]:rounded-full [&::before]:bg-white [&::before]:transition-transform checked:[&::before]:translate-x-[1.375rem] checked:[&::before]:bg-black';
 const LEVELS: [Levelling, string][] = [['off', 'Off'], ['track', 'Track'], ['album', 'Album']];
@@ -146,7 +147,12 @@ export default function Settings() {
 
       <PlaybackGroup />
 
-      <Group title="Listening recap" footer="Your day, week, month and year recaps are built from a small log kept only on this device. It is included in backups.">
+      <Group title="Listening recap" footer="Your day, week, month and year recaps are built from a small log kept only on this device. It is included in backups. Listening patterns read the same log, plus songs you skip early, to suggest what you usually play at this time of day (morning, afternoon, evening, night). Plain counting rules, nothing leaves the device; recent listens count most. Clearing the history clears both.">
+        <label className="mb-4 flex items-center justify-between gap-4 text-body font-medium">
+          Suggest by time of day
+          <input type="checkbox" role="switch" className={SWITCH} defaultChecked={patternsOn()} aria-label="Suggest by time of day"
+            onChange={(e) => { try { localStorage.setItem(PATTERNS_KEY, String(e.target.checked)); } catch { /* ignore */ } ui.toast(e.target.checked ? 'Time-of-day suggestions on' : 'Time-of-day suggestions off'); }} />
+        </label>
         <Link to="/recap" className="press mb-4 flex items-center justify-between text-body font-medium">View recap <ChevronRight size={18} className="text-fg-3" /></Link>
         <StatsSaver compact />
         <button className={`${btn} mt-4`} onClick={() => { if (confirm('Clear your listening history? Songs and playlists are not affected.')) void run('clear-history', async () => { await clearListeningHistory(); return 'Listening history cleared'; }); }}>Clear listening history</button>

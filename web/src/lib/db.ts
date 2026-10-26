@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { APP_BUILD, APP_VERSION } from './appInfo';
-import type { ArtEdit, Lyrics, PlayEvent, Playlist, Setting, Track, TrackArt, TrackBlob } from './types';
+import type { ArtEdit, Lyrics, PlayEvent, Playlist, Setting, SkipEvent, Track, TrackArt, TrackBlob } from './types';
 
 /**
  * DATA SAFETY CONTRACT
@@ -18,7 +18,7 @@ import type { ArtEdit, Lyrics, PlayEvent, Playlist, Setting, Track, TrackArt, Tr
  * Forbidden anywhere in the app (enforced by src/lib/dataSafety.test.ts): deleteDatabase, Dexie.delete, db.delete,
  * clearing library tables, localStorage.clear, unregistering service workers.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export class CadenceDB extends Dexie {
   tracks!: Table<Track, string>;
@@ -29,6 +29,7 @@ export class CadenceDB extends Dexie {
   lyrics!: Table<Lyrics, string>;
   artEdits!: Table<ArtEdit, string>;
   plays!: Table<PlayEvent, number>;
+  skips!: Table<SkipEvent, number>;
 
   constructor(name = 'cadence') {
     super(name);
@@ -46,6 +47,8 @@ export class CadenceDB extends Dexie {
     this.version(3).stores({ artEdits: 'trackId' });
     // v4 only adds the on-device listening log behind the recap. Nothing existing changes.
     this.version(4).stores({ plays: '++id, at, trackId' });
+    // v5 only adds a log of songs skipped early, so listening patterns can learn what not to suggest.
+    this.version(5).stores({ skips: '++id, at, trackId' });
   }
 }
 

@@ -7,13 +7,14 @@ let n = 0;
 const name = () => `mig-${Date.now()}-${n++}-${Math.random().toString(36).slice(2)}`;
 
 /** Creates a database exactly as an older release of Cadence did (the frozen v1 / v2 schema), with data in it. */
-async function seedOld(dbName: string, version: 1 | 2 | 3) {
+async function seedOld(dbName: string, version: 1 | 2 | 3 | 4) {
   const old = new Dexie(dbName);
   old.version(1).stores({
     tracks: 'id, &hash, title, artist, album, favorite, addedAt, lastPlayedAt', blobs: 'trackId', art: 'trackId', playlists: 'id, name, updatedAt', settings: 'key',
   });
   if (version >= 2) old.version(2).stores({ lyrics: 'trackId' });
   if (version >= 3) old.version(3).stores({ artEdits: 'trackId' });
+  if (version >= 4) old.version(4).stores({ plays: '++id, at, trackId' });
   await old.open();
   for (let i = 0; i < 5; i++) {
     const id = `t${i}`;
@@ -24,6 +25,7 @@ async function seedOld(dbName: string, version: 1 | 2 | 3) {
   await old.table('playlists').put({ id: 'p1', name: 'Mix', trackIds: ['t0', 't2', 't4'], createdAt: 1, updatedAt: 2 });
   await old.table('settings').bulkPut([{ key: 'queue', value: { ids: ['t3', 't1'], index: 1 } }, { key: 'volume', value: 0.4 }, { key: 'history', value: ['t2', 't0'] }]);
   if (version >= 2) await old.table('lyrics').put({ trackId: 't0', kind: 'plain', text: 'la la' });
+  if (version >= 4) await old.table('plays').add({ trackId: 't2', at: 1000, seconds: 120, title: 'Song 2', artist: 'A', album: 'B' });
   old.close();
 }
 
@@ -42,7 +44,7 @@ async function assertLibraryIntact(d: CadenceDB, lyrics: boolean) {
 }
 
 describe('database migrations keep your library', () => {
-  for (const from of [1, 2, 3] as const) {
+  for (const from of [1, 2, 3, 4] as const) {
     it(`v${from} database opens in the current build with every row and Blob intact`, async () => {
       const dbName = name();
       await seedOld(dbName, from);
@@ -53,7 +55,9 @@ describe('database migrations keep your library', () => {
       await assertLibraryIntact(d, from >= 2);
       // the stores added later exist and are empty, ready to use
       expect(await d.artEdits.count()).toBe(0);
-      expect(await d.plays.count()).toBe(0);
+      // the listening log survives (v4 had one); the skip log is new and empty
+      expect(await d.plays.count()).toBe(from >= 4 ? 1 : 0);
+      expect(await d.skips.count()).toBe(0);
       expect(await readStoredVersion(dbName)).toBe(SCHEMA_VERSION);
       d.close();
     });
@@ -89,7 +93,8 @@ describe('database migrations keep your library', () => {
     const future = new Dexie(dbName);
     future.version(3).stores({ tracks: 'id, &hash, title, artist, album, favorite, addedAt, lastPlayedAt', blobs: 'trackId', art: 'trackId', playlists: 'id, name, updatedAt', settings: 'key', lyrics: 'trackId', artEdits: 'trackId' });
     future.version(4).stores({ plays: '++id, at, trackId' });
-    future.version(5).stores({ extra: 'id' });
+    future.version(5).stores({ skips: '++id, at, trackId' });
+    future.version(6).stores({ extra: 'id' });
     await future.open();
     future.close();
     const d = new CadenceDB(dbName);
@@ -97,7 +102,7 @@ describe('database migrations keep your library', () => {
     // Dexie 4 opens a newer database as it is; if a browser reports VersionError instead, the app shows the recovery screen.
     if (r.ok) await assertLibraryIntact(d, true); else expect(r.reason).toBe('newer');
     d.close();
-    expect(await readStoredVersion(dbName)).toBe(5);
+    expect(await readStoredVersion(dbName)).toBe(6);
   });
 
   it('upgrades are additive: every old store keeps its original index definition', () => {
@@ -105,7 +110,7 @@ describe('database migrations keep your library', () => {
     const tracks = d.table('tracks').schema;
     expect(tracks.primKey.name).toBe('id');
     expect(tracks.indexes.map((i) => i.name).sort()).toEqual(['addedAt', 'album', 'artist', 'favorite', 'hash', 'lastPlayedAt', 'title']);
-    expect(d.tables.map((t) => t.name).sort()).toEqual(['art', 'artEdits', 'blobs', 'lyrics', 'playlists', 'plays', 'settings', 'tracks']);
+    expect(d.tables.map((t) => t.name).sort()).toEqual(['art', 'artEdits', 'blobs', 'lyrics', 'playlists', 'plays', 'settings', 'skips', 'tracks']);
   });
 
   it('records which builds opened the library, without growing forever', async () => {

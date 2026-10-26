@@ -30,6 +30,16 @@ describe('listening history in backups', () => {
     await importBackup(backup, { db: fresh });
     expect(await fresh.plays.count()).toBe(2);
   });
+
+  it('carries the skip log too, once', async () => {
+    const { db, added } = await seeded();
+    await db.skips.add({ trackId: added[1].id, at: 3000, listened: 7 });
+    const backup = await exportLibrary({ includeAudio: false, db });
+    const fresh = makeDb();
+    await importBackup(backup, { db: fresh });
+    await importBackup(backup, { db: fresh });
+    expect((await fresh.skips.toArray()).map((s) => [s.trackId, s.at, s.listened])).toEqual([[added[1].id, 3000, 7]]);
+  });
 });
 
 describe('export / import', () => {

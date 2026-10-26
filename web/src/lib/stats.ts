@@ -46,6 +46,11 @@ export class ListenTracker {
     }
   }
 
+  /** Seconds heard of the current song, and whether it already counted as a listen. */
+  progress(): { meta: Meta | null; listened: number; counted: boolean } {
+    return { meta: this.meta, listened: this.listened, counted: this.eventId !== null || this.startedAt !== 0 };
+  }
+
   /** Writes the final listened seconds for the current song. Safe to call often. */
   async flush(): Promise<void> {
     if (this.eventId !== null) await this.update(this.eventId, Math.round(this.listened)).catch(() => {});
@@ -174,6 +179,13 @@ export function currentStreak(all: PlayEvent[], now = Date.now()): number {
 
 export async function clearListeningHistory(d: CadenceDB = defaultDb): Promise<void> {
   await d.plays.clear();
+  await d.skips.clear();
+}
+
+/** Logs a song skipped with Next before it counted as a listen (and after the first second, so a mis-tap is no skip). */
+export async function logSkip(trackId: string, listened: number, d: CadenceDB = defaultDb, now = Date.now()): Promise<void> {
+  if (listened < 1) return;
+  await d.skips.add({ trackId, at: now, listened: Math.round(listened) });
 }
 
 // ---- stats file: a tiny copy of the listening history you can keep in Files ----

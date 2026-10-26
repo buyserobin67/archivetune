@@ -4,11 +4,29 @@ import { db } from './db';
 import { artVersion, getArtUrl, subscribeArt } from './art';
 import { getStorageStatus, type StorageStatus } from './storage';
 import { displayTrack } from './names';
+import { learnPatterns, slotOf, type Slot, type TrackPattern } from './rhythm';
 import type { Playlist, Track } from './types';
 
 export function useTracks(): Track[] | undefined {
   // Names are cleaned for display here, once, so every screen agrees (grouping, search, Go to artist).
   return useLiveQuery(() => db.tracks.orderBy('title').toArray().then((all) => all.map((t) => displayTrack(t))), []);
+}
+
+/** Listening patterns learned from the on-device log (listens + early skips). Recomputed when the log changes. */
+export function usePatterns(): Map<string, TrackPattern> | undefined {
+  return useLiveQuery(async () => learnPatterns(await db.plays.toArray(), await db.skips.toArray()), []);
+}
+
+/** The current part of the day; follows the clock while the app is open and when it comes back to the front. */
+export function useSlot(): Slot {
+  const [slot, setSlot] = useState<Slot>(() => slotOf(Date.now()));
+  useEffect(() => {
+    const check = () => setSlot(slotOf(Date.now()));
+    const id = setInterval(check, 60_000);
+    document.addEventListener('visibilitychange', check);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
+  }, []);
+  return slot;
 }
 
 export function usePlaylists(): Playlist[] | undefined {

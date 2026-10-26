@@ -46,7 +46,9 @@ Type is rem-based and `html` uses `font: -apple-system-body`, so iOS Dynamic Typ
 | Energize / Relax / Workout | ID3 genre tag matches the rule's genre list |
 | Commute | 2 to 6 minute songs you have played or favorited |
 
-Quick Picks blends favorites, most played and newest. Tracks imported before genre support are scanned once in the background (`lib/backfill.ts`).
+Quick Picks blends favorites, most played and newest.
+
+**Listening patterns** (`lib/rhythm.ts`): every counted listen is filed under morning (5–12), afternoon (12–17), evening (17–22) or night (22–5). Recent listens count more (half-life 45 days). A song "belongs" to a part of the day after at least 2 listens there and 40% of its (smoothed) listens; songs skipped early with Next at that time are pushed down, and left out when skipped more than played (skip log: `skips` store, schema v5). Home shows **Your mornings / afternoons / evenings / Late at night** once 3 songs qualify; a song's menu says "Usually in the evening (8 of 11 listens)"; the Recap has **Your rhythm** (share of listening per part of the day, favourite song each). Settings → Listening recap → *Suggest by time of day* hides the suggestions; clearing the history clears the skip log too. Backups carry both logs. Tracks imported before genre support are scanned once in the background (`lib/backfill.ts`).
 
 ## Playback
 

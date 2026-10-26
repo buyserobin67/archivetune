@@ -131,3 +131,12 @@ export interface PlayEvent {
   artist: string;
   album: string;
 }
+
+/** A song skipped with Next before it counted as a listen. Used only to learn what not to suggest. Stays on this device. */
+export interface SkipEvent {
+  id?: number;
+  trackId: string;
+  at: number;
+  /** Seconds heard before skipping. */
+  listened: number;
+}

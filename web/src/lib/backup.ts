@@ -1,7 +1,7 @@
 import { APP_VERSION } from './appInfo';
 import { db as defaultDb, SCHEMA_VERSION, type CadenceDB } from './db';
 import { isQuotaError, StorageQuotaError } from './errors';
-import type { Lyrics, PlayEvent, Playlist, Track } from './types';
+import type { Lyrics, PlayEvent, Playlist, SkipEvent, Track } from './types';
 
 /**
  * Backup container (".cadence"):
@@ -24,6 +24,8 @@ interface Manifest {
   app?: { version: string; schema: number };
   /** Optional: listening history for the recap. */
   plays?: Omit<PlayEvent, 'id'>[];
+  /** Optional: early skips, for listening patterns (absent in backups before 0.9). */
+  skips?: Omit<SkipEvent, 'id'>[];
 }
 
 export async function exportLibrary(opts: { includeAudio: boolean; db?: CadenceDB }): Promise<Blob> {
@@ -51,7 +53,8 @@ export async function exportLibrary(opts: { includeAudio: boolean; db?: CadenceD
   }
   const lyrics = await d.lyrics.toArray();
   const plays = (await d.plays.toArray()).map(({ id: _id, ...e }) => e);
-  const manifest: Manifest = { version: 1, exportedAt: Date.now(), includesAudio: opts.includeAudio, tracks: entries, playlists, lyrics, plays, app: { version: APP_VERSION, schema: SCHEMA_VERSION } };
+  const skips = (await d.skips.toArray()).map(({ id: _id, ...e }) => e);
+  const manifest: Manifest = { version: 1, exportedAt: Date.now(), includesAudio: opts.includeAudio, tracks: entries, playlists, lyrics, plays, skips, app: { version: APP_VERSION, schema: SCHEMA_VERSION } };
   const json = new TextEncoder().encode(JSON.stringify(manifest));
   const len = new Uint8Array(4);
   new DataView(len.buffer).setUint32(0, json.length);
@@ -112,6 +115,9 @@ export async function importBackup(file: Blob, opts: { db?: CadenceDB } = {}): P
   const have = new Set((await d.plays.toArray()).map((e) => `${e.trackId}@${e.at}`));
   const fresh = (manifest.plays ?? []).map((e) => ({ ...e, trackId: idMap.get(e.trackId) ?? e.trackId })).filter((e) => !have.has(`${e.trackId}@${e.at}`));
   if (fresh.length) await d.plays.bulkAdd(fresh);
+  const haveSkips = new Set((await d.skips.toArray()).map((e) => `${e.trackId}@${e.at}`));
+  const freshSkips = (manifest.skips ?? []).map((e) => ({ ...e, trackId: idMap.get(e.trackId) ?? e.trackId })).filter((e) => !haveSkips.has(`${e.trackId}@${e.at}`));
+  if (freshSkips.length) await d.skips.bulkAdd(freshSkips);
 
   for (const p of manifest.playlists) {
     const trackIds = p.trackIds.map((t) => idMap.get(t)).filter((t): t is string => !!t);

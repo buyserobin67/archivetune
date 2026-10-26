@@ -281,3 +281,20 @@ describe('polish: prefetch, levelling, stale resume', () => {
     expect(player.getState().queue.items).toEqual(before.items);
   });
 });
+
+describe('skip log', () => {
+  const listen = (audio: FakeAudio, to: number) => { for (let t = 0.5; t <= to; t += 0.5) { audio.currentTime = t; audio.dispatchEvent(new Event('timeupdate')); } };
+  it('logs a Next before the song counted as a listen, not after, and not a mis-tap', async () => {
+    const { db, audio, player, ids } = await setup(3);
+    await player.playQueue(ids, 0);
+    listen(audio, 6);
+    await player.next();
+    await tick(10);
+    expect((await db.skips.toArray()).map((s) => [s.trackId, s.listened])).toEqual([[ids[0], 6]]);
+    await player.next(); // straight away: a mis-tap, not a skip
+    listen(audio, 40);
+    await player.next(); // after 30 s it was a listen
+    await tick(10);
+    expect(await db.skips.count()).toBe(1);
+  });
+});

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ShareIcon } from '../components/Icons';
 import { renderRecapCard, shareOrSave } from '../lib/recapCard';
 import { ui } from '../lib/ui';
 import { displayEvent } from '../lib/names';
+import { peakSlot, rhythmSummary, SLOT_INFO } from '../lib/rhythm';
 import { StatsSaver } from '../components/StatsSaver';
 import { db } from '../lib/db';
 import { getPlayer } from '../lib/player';
@@ -71,6 +72,31 @@ function ShareCard({ recap, period }: { recap: RecapData; period: Period }) {
       onClick={async () => { if (!blob) return; const r = await shareOrSave(blob, name); if (r === 'saved') ui.toast('Recap image saved'); }}>
       <ShareIcon size={16} /> Share
     </button>
+  );
+}
+
+/** How this period's listening falls over the day, with the favourite for each part. Learned from this device only. */
+function Rhythm({ events }: { events: Parameters<typeof rhythmSummary>[0] }) {
+  const summary = useMemo(() => rhythmSummary(events), [events]);
+  const peak = peakSlot(summary);
+  if (!events.length) return null;
+  return (
+    <section className="mx-gutter mt-5 rounded-xl bg-s1 p-5" aria-label="Your rhythm" data-testid="recap-rhythm">
+      <div className="text-caption uppercase tracking-wider text-fg-3">Your rhythm</div>
+      <h2 className="mt-1 text-title font-bold">{peak ? `Mostly ${SLOT_INFO[peak].when}` : 'Spread over the day'}</h2>
+      <ul className="mt-4 space-y-3">
+        {summary.map((s) => (
+          <li key={s.slot} className="min-w-0">
+            <div className="flex items-baseline justify-between gap-3 text-footnote">
+              <span className="font-semibold">{SLOT_INFO[s.slot].label} <span className="font-normal text-fg-3">{SLOT_INFO[s.slot].hours}</span></span>
+              <span className="shrink-0 tabular-nums text-fg-2">{Math.round(s.share * 100)}%</span>
+            </div>
+            <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${s.slot === peak ? 'bg-fg' : 'bg-fg/50'}`} style={{ width: `${Math.max(s.plays ? 3 : 0, s.share * 100)}%` }} /></div>
+            {s.topTrack && <div className="mt-1 truncate text-caption text-fg-3">{s.topTrack.title} · {s.topTrack.artist}</div>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -142,6 +168,8 @@ export default function Recap() {
               {recap.bars.map((b, i) => <span key={i} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-center">{b.label}</span>)}
             </div>
           </section>
+
+          <Rhythm events={events ?? []} />
 
           <div className="mt-7">
             <RankList title="Top artists" rows={recap.topArtists} kind="artist" />

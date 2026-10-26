@@ -389,6 +389,39 @@ try {
   const meta = await page.evaluate(() => ({ title: navigator.mediaSession?.metadata?.title, artist: navigator.mediaSession?.metadata?.artist }));
   check(meta.title === 'Tide Study' && meta.artist === 'Nova Vale', 'the lock screen gets the clean names too', JSON.stringify(meta));
 
+  console.log('== listening patterns');
+  await page.evaluate(() => new Promise((ok, no) => {
+    const r = indexedDB.open('cadence');
+    r.onsuccess = () => {
+      const db = r.result, tx = db.transaction(['tracks', 'plays'], 'readwrite');
+      const q = tx.objectStore('tracks').getAll();
+      q.onsuccess = () => {
+        const pick = q.result.filter((t) => ['Drift One', 'Neon Run', 'Pulse Grid'].includes(t.title));
+        const now = Date.now(), day = 86400000;
+        // the same hour as now, on earlier days: these songs "belong" to this part of the day
+        for (const t of pick) for (const d of [1, 2, 3, 5]) tx.objectStore('plays').add({ trackId: t.id, at: now - d * day, seconds: 180, title: t.title, artist: t.artist, album: t.album });
+      };
+      tx.oncomplete = () => { db.close(); ok(); }; tx.onerror = () => no(tx.error);
+    };
+  }));
+  await page.goto(`${URL}#/`);
+  await page.reload();
+  await page.waitForTimeout(1200);
+  const slotSection = page.locator('main [data-slot]');
+  check(await slotSection.count() === 1, 'Home offers what you usually play at this time of day');
+  const slotTitles = await page.locator('main section').filter({ has: page.locator('[data-slot]') }).innerText();
+  check(['Drift One', 'Neon Run', 'Pulse Grid'].every((t) => slotTitles.includes(t)), 'with the songs you played at this hour', slotTitles.slice(0, 120));
+  await shot('20-home-slot');
+  await page.locator('main section').filter({ has: page.locator('[data-slot]') }).locator('[aria-label^="Play Neon Run"]').first().click({ button: 'right' });
+  await page.waitForTimeout(400);
+  check(/^Usually (in the|at) /.test(await page.locator('[data-habit]').innerText().catch(() => '')), 'a song\'s menu says when you usually play it');
+  await page.keyboard.press('Escape');
+  await page.goto(`${URL}#/recap`);
+  await page.waitForSelector('[data-testid="recap-rhythm"]', { timeout: 6000 }).catch(() => {});
+  check(/Your rhythm/i.test(await page.locator('[data-testid="recap-rhythm"]').innerText().catch(() => '')), 'the recap shows how your listening falls over the day');
+  await page.locator('[data-testid="recap-rhythm"]').scrollIntoViewIfNeeded();
+  await shot('21-recap-rhythm');
+
   console.log('== settings');
   await page.goto(`${URL}#/settings`);
   await page.waitForTimeout(500);

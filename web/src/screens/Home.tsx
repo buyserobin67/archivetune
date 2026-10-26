@@ -7,7 +7,9 @@ import { ImportButton } from '../components/ImportButton';
 import { groupAlbums } from '../lib/library';
 import { availableMoods, quickPicks, tracksForMood, type MoodId } from '../lib/moods';
 import { getPlayer } from '../lib/player';
-import { useTracks } from '../lib/hooks';
+import { usePatterns, useSlot, useTracks } from '../lib/hooks';
+import { picksFor, SLOT_INFO } from '../lib/rhythm';
+import { patternsOn } from '../lib/patternsPref';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import { computeRecap, formatListening } from '../lib/stats';
@@ -42,6 +44,10 @@ export default function Home() {
     };
   }, [tracks]);
 
+  const patterns = usePatterns();
+  const slot = useSlot();
+  // Songs you usually play at this time of day, learned on this device. Shown once there are enough of them.
+  const slotPicks = useMemo(() => (patterns && patternsOn() ? picksFor(slot, patterns, data.all) : []), [patterns, slot, data.all]);
   const activeMood = data.moods.find((m) => m.id === mood) ?? null;
   const picks = activeMood ? tracksForMood(data.all, activeMood.id).slice(0, 12) : data.picks;
   const playFromAll = (id: string) => void p.playQueue(data.ids, data.ids.indexOf(id));
@@ -83,6 +89,16 @@ export default function Home() {
           </span>
           <ChevronRight size={20} className="shrink-0 text-fg-3" />
         </Link>
+      )}
+
+      {slotPicks.length >= 3 && !activeMood && (
+        <Section
+          title={SLOT_INFO[slot].title}
+          action={<button className="press flex h-8 items-center gap-1 rounded-full bg-s2 px-3 text-footnote font-semibold" onClick={() => playList(slotPicks.map((x) => x.track), 0)} aria-label={`Play ${SLOT_INFO[slot].title.toLowerCase()}`}><PlayIcon size={14} /> Play</button>}
+        >
+          <p className="-mt-2 mb-3 px-gutter text-footnote text-fg-2" data-slot={slot}>What you usually play {SLOT_INFO[slot].when}, learned on this device.</p>
+          <Shelf>{slotPicks.map((x, i) => <TrackCard key={x.track.id} track={x.track} onPlay={() => playList(slotPicks.map((y) => y.track), i)} />)}</Shelf>
+        </Section>
       )}
 
       {picks.length > 0 && (

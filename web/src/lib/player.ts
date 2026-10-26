@@ -4,7 +4,7 @@ import { db as defaultDb, getSetting, setSetting, type CadenceDB } from './db';
 import { markPlayed } from './library';
 import { gainToVolume, readLevelling, type Levelling } from './levelling';
 import { displayTrack } from './names';
-import { dbListenWriters, ListenTracker } from './stats';
+import { dbListenWriters, ListenTracker, logSkip } from './stats';
 import * as Q from './queue';
 import type { RepeatMode, Track } from './types';
 
@@ -351,7 +351,12 @@ export class Player {
 
   toggle() { return this.state.isPlaying ? this.pause() : this.play(); }
 
-  async next() { await this.skipForward(); }
+  async next() {
+    // A Next before the song counted as a listen is a skip: listening patterns use it to avoid suggesting the song then.
+    const pr = this.tracker.progress();
+    if (pr.meta && !pr.counted && this.state.isPlaying) void logSkip(pr.meta.id, pr.listened, this.db).catch(() => {});
+    await this.skipForward();
+  }
 
   private async skipForward() {
     const { state, ended } = Q.next(this.state.queue, false);

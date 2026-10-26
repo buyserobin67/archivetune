@@ -8,6 +8,7 @@ import { getPlayer } from '../lib/player';
 import { addToPlaylist, createPlaylist } from '../lib/playlists';
 import { usePlaylists, useTracks } from '../lib/hooks';
 import { displayTrack } from '../lib/names';
+import { habitOf, learnPatterns } from '../lib/rhythm';
 import { formatBytes, formatTime } from '../lib/storage';
 import { ui, useUI } from '../lib/ui';
 import { browserArtProcessor, trimTrack, useOriginal } from '../lib/artEdits';
@@ -55,6 +56,12 @@ export function TrackSheet() {
   useEffect(() => setConfirmDelete(false), [sheetTrackId]);
   const artEdit = useLiveQuery(() => (sheetTrackId ? db.artEdits.get(sheetTrackId) : undefined), [sheetTrackId]);
   const nav = useNavigate();
+  // When this song is usually played, from its own listens and skips.
+  const habit = useLiveQuery(async () => {
+    if (!sheetTrackId) return null;
+    const [plays, skips] = await Promise.all([db.plays.where('trackId').equals(sheetTrackId).toArray(), db.skips.where('trackId').equals(sheetTrackId).toArray()]);
+    return habitOf(learnPatterns(plays, skips).get(sheetTrackId));
+  }, [sheetTrackId]);
   if (!sheetTrackId || !track) return null;
   const p = getPlayer();
   const close = ui.closeTrackSheet;
@@ -88,6 +95,7 @@ export function TrackSheet() {
           {track.license.url && <> · <a className="text-accent-text underline" href={track.license.url} target="_blank" rel="noreferrer noopener">License text</a></>}
         </div>
       )}
+      {habit && <div className="px-1 pt-2 text-footnote text-fg-2" data-habit>{habit.text}</div>}
       <div className="px-1 py-2 text-caption text-fg-3">{track.mime} · {formatBytes(track.size)} · {formatTime(track.duration)} · {track.fileName}</div>
       {confirmDelete ? (
         <SheetItem danger icon={<TrashIcon size={20} />} label="Tap again to delete from this device" onClick={async () => {
