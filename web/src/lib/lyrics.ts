@@ -1,5 +1,5 @@
 import { db as defaultDb, type CadenceDB } from './db';
-import { baseName, isLyricFile, parseLrc, toLyrics } from './lrc';
+import { baseName, isLyricFile, parseLyricsText, toLyrics } from './lrc';
 import type { Lyrics, Track } from './types';
 
 export { isLyricFile };
@@ -10,7 +10,7 @@ export async function getLyrics(trackId: string, d: CadenceDB = defaultDb): Prom
 
 /** Saves lyrics from LRC or plain text the user provided. Returns null if the text held no lyrics. */
 export async function saveLyricsText(trackId: string, text: string, source: Lyrics['source'], d: CadenceDB = defaultDb): Promise<Lyrics | null> {
-  const lyrics = toLyrics(trackId, parseLrc(text), source);
+  const lyrics = toLyrics(trackId, parseLyricsText(text), source);
   if (lyrics) await d.lyrics.put(lyrics);
   return lyrics;
 }

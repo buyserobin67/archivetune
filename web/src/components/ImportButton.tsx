@@ -28,7 +28,7 @@ export function ImportButton({ variant = 'pill', label = 'Import music', classNa
   const status = progress ? `Importing ${Math.min(progress.done + 1, progress.total)} of ${progress.total}` : label;
   return (
     <>
-      <input ref={input} type="file" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff,.aif,.caf,.ogg,.opus,.lrc,.txt" className="hidden" onChange={(e) => void onFiles(e.target.files)} />
+      <input ref={input} type="file" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.aiff,.aif,.caf,.ogg,.opus,.lrc,.ttml,.txt" className="hidden" onChange={(e) => void onFiles(e.target.files)} />
       {variant === 'icon' || variant === 'compact' ? variant === 'icon' ? (
         <button
           className={`press relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-black disabled:opacity-90 ${className}`}

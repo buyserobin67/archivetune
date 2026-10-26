@@ -4,7 +4,7 @@ import * as Q from '../lib/queue';
 import { db } from '../lib/db';
 import { toggleFavorite } from '../lib/library';
 import { removeLyrics } from '../lib/lyrics';
-import { clampOffset } from '../lib/lrc';
+import { clampOffset, displayLyrics, linesToSync } from '../lib/lrc';
 import { useArtThumb, useGlobalAccent } from '../lib/accent';
 import { getPlayer, usePlayer, usePlaybackTime } from '../lib/player';
 import { haptic } from '../lib/haptics';
@@ -16,14 +16,14 @@ import { formatRemaining, formatTime } from '../lib/storage';
 import { supportsViewTransitions, ui, useUI } from '../lib/ui';
 import type { Track } from '../lib/types';
 import { Art } from './Art';
-import { LyricsView, PasteLyricsSheet, useLyricFilePicker } from './LyricsView';
+import { LyricsView, PasteLyricsSheet, SyncLyricsSheet, useLyricFilePicker } from './LyricsView';
 import { SeekBar } from './SeekBar';
 import { Marquee } from './Marquee';
 import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetItem } from './Sheets';
 import { ToastBubble } from './Toast';
 import {
-  ChevronDown, GripIcon, HeartIcon, MoonIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PlusIcon, PrevIcon, QueueIcon,
+  ChevronDown, CloseIcon, GripIcon, HeartIcon, MoonIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PlusIcon, PrevIcon, QueueIcon,
   QuoteIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, TimingIcon, TrashIcon,
 } from './Icons';
 
@@ -374,28 +374,41 @@ function QueueRow({ track: t, dim, controls, dragging, style, onPlay, onRemove, 
 function LyricsTab({ track, touch }: { track: Track; touch: Touchy }) {
   const [menu, setMenu] = useState(false);
   const [paste, setPaste] = useState(false);
+  const [sync, setSync] = useState(false);
   const stored = useLiveQuery(() => db.lyrics.get(track.id).then((l) => l ?? null), [track.id]);
   const has = !!stored;
   const picker = useLyricFilePicker(track);
+  const shown = stored ? displayLyrics(stored) : null;
+  const syncLines = shown ? (shown.kind === 'synced' ? (shown.lines ?? []).map((l) => l.text).filter(Boolean) : linesToSync(shown.text ?? '')) : [];
   return (
     <>
-      <Header
-        eyebrow={track.artist} title={track.title} touch={touch}
-        left={<CircleButton label="Back to player" onClick={() => ui.setPlayerTab('now')}><ChevronDown size={22} /></CircleButton>}
-        right={<CircleButton label="Lyrics options" onClick={() => setMenu(true)}><MoreIcon size={18} /></CircleButton>}
-      />
+      {/* Small cover, title and artist, then options and close: the song stays in view while reading. */}
+      <header className="relative shrink-0 px-gutter pb-2" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)', touchAction: 'none' }}
+        onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd} data-lyrics-header>
+        <div className="flex items-center gap-3">
+          <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="h-12 w-12" rounded="rounded-lg" shadow />
+          <div className="min-w-0 flex-1">
+            <div className="text-body-lg font-semibold leading-tight"><Marquee key={track.id} text={track.title} /></div>
+            <div className="truncate text-footnote text-fg-2">{track.artist}</div>
+          </div>
+          <CircleButton label="Lyrics options" onClick={() => setMenu(true)}><MoreIcon size={18} /></CircleButton>
+          <CircleButton label="Back to player" onClick={() => ui.setPlayerTab('now')}><CloseIcon size={18} /></CircleButton>
+        </div>
+      </header>
       <LyricsView track={track} />
       <Transport compact />
       {picker.el}
       {menu && (
         <Sheet title="Lyrics" onClose={() => setMenu(false)}>
-          <SheetItem icon={<QuoteIcon size={20} />} label={has ? 'Replace from .lrc / .txt file' : 'Add .lrc / .txt file'} onClick={() => { setMenu(false); picker.open(); }} />
+          <SheetItem icon={<QuoteIcon size={20} />} label={has ? 'Replace from .lrc / .ttml / .txt' : 'Add .lrc / .ttml / .txt'} onClick={() => { setMenu(false); picker.open(); }} />
           <SheetItem icon={<QuoteIcon size={20} />} label="Paste lyrics" onClick={() => { setMenu(false); setPaste(true); }} />
+          {syncLines.length > 0 && <SheetItem icon={<TimingIcon size={20} />} label={stored?.kind === 'synced' ? 'Re-sync to song' : 'Sync to song'} onClick={() => { setMenu(false); setSync(true); }} />}
           {stored?.kind === 'synced' && <TimingNudge trackId={track.id} offset={stored.offset ?? 0} />}
           {has && <SheetItem danger icon={<TrashIcon size={20} />} label="Remove lyrics" onClick={async () => { await removeLyrics(track.id); setMenu(false); ui.toast('Lyrics removed'); }} />}
         </Sheet>
       )}
       {paste && <PasteLyricsSheet track={track} onClose={() => setPaste(false)} />}
+      {sync && <SyncLyricsSheet track={track} lines={syncLines} onClose={() => setSync(false)} />}
     </>
   );
 }

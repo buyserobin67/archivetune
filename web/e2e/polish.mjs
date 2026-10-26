@@ -232,6 +232,82 @@ try {
   });
   check(!!art && art.w === art.h, 'a wide cover reaches the lock screen / Dynamic Island as the same square the app shows', JSON.stringify(art));
 
+  console.log('== lyrics: depth, motion, header, ttml, sync');
+  await page.goto(`${URL}#/search`);
+  await page.getByPlaceholder('Songs, artists, albums').fill('Ember');
+  await page.getByRole('button', { name: /^Play Ember Lines/ }).first().click();
+  await page.waitForTimeout(500);
+  await page.click('[aria-label^="Open player"]');
+  await page.waitForTimeout(700);
+  for (const l of ['Hide queue']) if (await page.locator(`${P} [aria-label="${l}"]`).count()) await page.click(`${P} [aria-label="${l}"]`);
+  if (!(await page.locator(`${P} [data-lyrics-header]`).count())) await page.click(`${P} [aria-label="Show lyrics"]`);
+  await page.waitForSelector(`${P} [aria-current="true"]`, { timeout: 6000 }).catch(() => {});
+  check(await page.locator(`${P} [data-lyrics-header] img, ${P} [data-lyrics-header] [class*="aspect-square"]`).count() >= 1 && await page.locator(`${P} [data-lyrics-header] [aria-label="Back to player"]`).count() === 1, 'lyrics header shows the cover, title and a close button');
+  const looks = await page.evaluate((sel) => {
+    const lines = [...document.querySelectorAll(`${sel} [data-line] button`)];
+    const i = lines.findIndex((b) => b.getAttribute('aria-current') === 'true');
+    return { i, filters: lines.map((b) => getComputedStyle(b).filter) };
+  }, P);
+  const far = looks.filters.filter((f, k) => Math.abs(k - looks.i) >= 2 && /blur/.test(f)).length;
+  check(looks.i >= 0 && !/blur/.test(looks.filters[looks.i]) && far >= 1, 'lines further from the sung one are blurred, the sung one is sharp', JSON.stringify(looks));
+  const moved = await page.evaluate((sel) => new Promise((ok) => {
+    const box = document.querySelector(`${sel} [data-kind="synced"]`);
+    const seen = new Set();
+    const t0 = performance.now();
+    const tick = () => {
+      box.querySelectorAll('[data-line]').forEach((el, k) => { if (el.getAnimations().length) seen.add(k); });
+      if (seen.size >= 3 || performance.now() - t0 > 3000) ok(seen.size); else requestAnimationFrame(tick);
+    };
+    tick();
+  }), P);
+  check(moved >= 3, 'when the line changes, the lines spring up one after another', String(moved));
+  const lift = await page.evaluate((sel) => new Promise((ok) => {
+    let best = 0;
+    const t0 = performance.now();
+    const tick = () => {
+      document.querySelectorAll(`${sel} .karaoke`).forEach((e) => { const m = /translateY\((-?[\d.]+)em\)/.exec(e.style.transform); if (m) best = Math.min(best, Number(m[1])); });
+      if (best < -0.02 || performance.now() - t0 > 3000) ok(best); else requestAnimationFrame(tick);
+    };
+    tick();
+  }), P);
+  check(lift < -0.02, 'the word being sung lifts slightly', String(lift));
+  await shot('18-lyrics-depth');
+  const ttml = `<?xml version="1.0"?><tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="0:00.40"><span begin="0:00.40">Imported</span> <span begin="0:00.90">from</span> <span begin="0:01.30">TTML</span></p><p begin="0:02.20">Second line here</p></div></body></tt>`;
+  await page.setInputFiles(`${P} input[type=file]`, { name: 'ember.ttml', mimeType: 'application/ttml+xml', buffer: Buffer.from(ttml) });
+  await page.waitForTimeout(800);
+  check(await page.locator(`${P} [data-line]`).count() === 2 && /Imported from TTML/.test(await page.locator(`${P} [data-kind="synced"]`).innerText()), 'a .ttml file gives word-timed synced lyrics');
+
+  // Tide Study has plain (untimed) lyrics: sync them by tapping
+  await page.click(`${P} [aria-label="Back to player"]`);
+  await page.click(`${P} [aria-label="Close player"]`);
+  await page.waitForTimeout(600);
+  await page.getByPlaceholder('Songs, artists, albums').fill('Tide');
+  await page.getByRole('button', { name: /^Play Tide Study/ }).first().click();
+  await page.waitForTimeout(500);
+  await page.click('[aria-label^="Open player"]');
+  await page.waitForTimeout(700);
+  if (!(await page.locator(`${P} [data-lyrics-header]`).count())) await page.click(`${P} [aria-label="Show lyrics"]`);
+  if (!(await page.locator(`${P} [data-plain-lyrics]`).count())) {
+    await page.locator(`${P}`).getByRole('button', { name: 'Paste', exact: true }).click();
+    await page.getByLabel('Lyrics text').fill('First plain line\nSecond plain line\n\nThird plain line\nFourth plain line');
+    await page.getByRole('button', { name: 'Save lyrics' }).click();
+  }
+  await page.waitForSelector(`${P} [data-plain-lyrics]`, { timeout: 6000 });
+  await page.click(`${P} [data-sync-start]`);
+  await page.waitForSelector('[data-sync-tap]');
+  const total = await page.locator('[data-sync-line]').count();
+  await page.getByRole('dialog').getByRole('button', { name: 'From the start' }).click();
+  await page.waitForTimeout(300);
+  for (let k = 0; k < total; k++) { await page.click('[data-sync-tap]'); await page.waitForTimeout(60); }
+  check(await page.locator('[data-sync-tap]').innerText() === 'All lines timed', `tapping through every line times them all (${total} lines)`);
+  await shot('19-sync-tool');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForTimeout(800);
+  check(await page.locator(`${P} [data-kind="synced"] [data-line]`).count() === total, 'plain lyrics are now synced to the song');
+  await page.click(`${P} [aria-label="Back to player"]`);
+  await page.click(`${P} [aria-label="Close player"]`);
+  await page.waitForTimeout(600);
+
   console.log('== look: glass, ambient, glow, marquee');
   check(await page.locator('nav[aria-label="Primary"] ul.glass').count() === 1 && await page.locator('[data-miniplayer].glass').count() === 1, 'tab bar and mini-player use the frosted glass surface');
   const blur = await page.evaluate(() => getComputedStyle(document.querySelector('nav[aria-label="Primary"] ul')).backdropFilter || getComputedStyle(document.querySelector('nav[aria-label="Primary"] ul')).webkitBackdropFilter);

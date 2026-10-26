@@ -1,4 +1,4 @@
-import { parseLrc, toLyrics } from './lrc';
+import { parseLyricsText, syncedFromEntries, toLyrics } from './lrc';
 import type { ParsedMeta } from './types';
 
 export type MetaParser = (file: Blob, fileName: string) => Promise<ParsedMeta>;
@@ -40,13 +40,13 @@ function embeddedLyrics(tags: EmbeddedLyrics | undefined): ParsedMeta['lyrics'] 
   for (const l of tags ?? []) {
     const synced = (l.syncText ?? []).filter((s) => typeof s.timestamp === 'number');
     if (l.timeStampFormat === 2 && synced.length) {
-      const lines = synced.map((s) => ({ t: (s.timestamp as number) / 1000, text: s.text.replace(/\s+/g, ' ').trim() })).sort((a, b) => a.t - b.t);
+      const lines = syncedFromEntries(synced.map((s) => ({ t: (s.timestamp as number) / 1000, text: s.text })));
       return { kind: 'synced', lines, source: 'embedded' };
     }
   }
   for (const l of tags ?? []) {
     if (!l.text?.trim()) continue;
-    const parsed = toLyrics('', parseLrc(l.text), 'embedded');
+    const parsed = toLyrics('', parseLyricsText(l.text), 'embedded');
     if (parsed) { const { trackId: _t, ...rest } = parsed; return rest; }
   }
   return undefined;

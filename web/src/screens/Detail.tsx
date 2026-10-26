@@ -69,7 +69,7 @@ function CompactHeader({ back, title, show }: { back: string; title: string; sho
   const nav = useNavigate();
   return (
     <div className={`glass fixed inset-x-0 top-0 z-20 flex items-center gap-2 rounded-none px-gutter pb-2 transition-opacity duration-fast ${show ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-      style={{ paddingTop: 'calc(var(--sat) + 0.375rem)', boxShadow: 'inset 0 -0.5px 0 rgb(255 255 255 / .08)' }} aria-hidden={!show} data-compact-header>
+      style={{ paddingTop: 'calc(var(--sat) + 0.375rem)', boxShadow: 'inset 0 -0.5px 0 rgb(255 255 255 / .08)' }} aria-hidden={show ? undefined : true} data-compact-header>
       <button className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10" aria-label="Back" tabIndex={show ? 0 : -1}
         onClick={() => (window.history.length > 1 ? nav(-1) : nav(back))}><ChevronLeft size={22} /></button>
       <div className="min-w-0 flex-1 truncate text-center text-body font-semibold">{title}</div>

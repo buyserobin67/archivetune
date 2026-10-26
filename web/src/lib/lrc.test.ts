@@ -105,3 +105,18 @@ describe('syllable stamps', () => {
     expect(l.words).toEqual([{ t: 1, text: 'Hel' }, { t: 1.2, text: 'lo ' }, { t: 1.5, text: 'there' }]);
   });
 });
+
+describe('tap to sync', () => {
+  it('builds synced lines from taps, a little earlier than tapped, always in order', async () => {
+    const { linesFromTaps, linesToSync, toLrcText, TAP_LEAD } = await import('./lrc');
+    const lines = linesToSync('One\nTwo\n\nThree');
+    expect(lines).toEqual(['One', 'Two', 'Three']);
+    const synced = linesFromTaps(lines, [1, 3.5, 3.4]);
+    expect(synced[0].t).toBeCloseTo(1 - TAP_LEAD);
+    expect(synced[1].t).toBeCloseTo(3.5 - TAP_LEAD);
+    expect(synced[2].t).toBeGreaterThan(synced[1].t);
+    expect(linesFromTaps(lines, [0.05])).toEqual([{ t: 0, text: 'One' }]);
+    expect(toLrcText([{ t: 65.5, text: 'Hi' }])).toBe('[01:05.50]Hi\n');
+    expect(parseLrc(toLrcText(synced)).lines!.map((l) => l.text)).toEqual(lines);
+  });
+});

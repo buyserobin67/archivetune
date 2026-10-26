@@ -1,8 +1,10 @@
+import { looksLikeTtml, parseTtml } from './ttml';
 import type { LyricLine, LyricWord, Lyrics } from './types';
 
-const TS = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
-const WORD_TS = /<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g;
-const WORD_TS_PARTS = /<(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?>/g;
+// [mm:ss], [mm:ss.xx], [mm:ss:xx] and [mm:ss,xx] (some Windows tools write a comma).
+const TS = /\[(\d{1,3}):(\d{1,2})(?:[.:,](\d{1,3}))?\]/g;
+const WORD_TS = /<\d{1,3}:\d{1,2}(?:[.:,]\d{1,3})?>/g;
+const WORD_TS_PARTS = /<(\d{1,3}):(\d{1,2})(?:[.:,](\d{1,3}))?>/g;
 
 const stampSeconds = (min: string, sec: string, frac?: string) => Number(min) * 60 + Number(sec) + (frac ? Number(frac) / 10 ** frac.length : 0);
 
@@ -150,6 +152,25 @@ export function currentLineIndex(lines: LyricLine[], time: number): number {
   return ans;
 }
 
+/** Any lyric text the user gives Cadence: TTML (Apple's word-timed format), LRC, or plain text. */
+export function parseLyricsText(raw: string): ParsedLyrics {
+  if (looksLikeTtml(raw)) {
+    const lines = cleanSyncedLines(parseTtml(raw));
+    if (lines.some((l) => l.text)) return { kind: 'synced', lines };
+  }
+  return parseLrc(raw);
+}
+
+/** Lines from a metadata reader that already split LRC (it leaves enhanced word stamps in the text). */
+export function syncedFromEntries(entries: { t: number; text: string }[]): LyricLine[] {
+  return entries.map((e) => {
+    const body = e.text;
+    const text = body.replace(WORD_TS, '').replace(/\s+/g, ' ').trim();
+    const words = parseWords(body, e.t);
+    return words ? { t: e.t, text, words } : { t: e.t, text };
+  }).sort((a, b) => a.t - b.t);
+}
+
 export function toLyrics(trackId: string, parsed: ParsedLyrics, source: Lyrics['source']): Lyrics | null {
   if (parsed.kind === 'synced' && parsed.lines?.some((l) => l.text)) return { trackId, kind: 'synced', lines: parsed.lines, source };
   if (parsed.kind === 'plain' && parsed.text?.trim()) return { trackId, kind: 'plain', text: parsed.text, source };
@@ -157,7 +178,7 @@ export function toLyrics(trackId: string, parsed: ParsedLyrics, source: Lyrics['
 }
 
 /** Lyric file names we accept as sidecars. */
-export const isLyricFile = (name: string) => /\.(lrc|txt)$/i.test(name);
+export const isLyricFile = (name: string) => /\.(lrc|txt|ttml)$/i.test(name);
 
 export const baseName = (name: string) => name.replace(/\.[^.]+$/, '').trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -207,3 +228,34 @@ export const wordProgress = (w: TimedWord, time: number) => (time <= w.t ? 0 : t
 
 /** Lyrics timing nudge, in seconds, kept to 0.1 s steps and within ±10 s. */
 export const clampOffset = (s: number) => Math.max(-10, Math.min(10, Math.round(s * 10) / 10));
+
+// ---- tap-to-sync (turning plain lyrics into synced ones on the device) ----
+
+/** People tap a little after they hear a line start; this much is taken off each tap. */
+export const TAP_LEAD = 0.15;
+
+/** The lines to sync, from plain text: real lines only, stanza breaks dropped. */
+export const linesToSync = (text: string) => stanzas(text).flat();
+
+/** Synced lines from tap times. Taps must rise; a tap is moved earlier by TAP_LEAD, never before the previous line. */
+export function linesFromTaps(lines: string[], taps: number[]): LyricLine[] {
+  const out: LyricLine[] = [];
+  let prev = -Infinity;
+  lines.forEach((text, i) => {
+    const raw = taps[i];
+    if (raw === undefined || !Number.isFinite(raw)) return;
+    const t = Math.max(0, prev + 0.01, raw - TAP_LEAD);
+    prev = t;
+    out.push({ t: Math.round(t * 100) / 100, text });
+  });
+  return out;
+}
+
+/** LRC text for a set of synced lines, so the user can keep the result as a file. */
+export function toLrcText(lines: LyricLine[]): string {
+  const stamp = (t: number) => {
+    const cs = Math.round(t * 100);
+    return `[${String(Math.floor(cs / 6000)).padStart(2, '0')}:${String(Math.floor((cs % 6000) / 100)).padStart(2, '0')}.${String(cs % 100).padStart(2, '0')}]`;
+  };
+  return lines.map((l) => `${stamp(l.t)}${l.text}`).join('\n') + '\n';
+}

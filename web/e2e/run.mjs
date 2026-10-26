@@ -44,7 +44,8 @@ function overflowing(page, scope = 'body') {
   return page.evaluate((scopeSel) => {
     const vw = document.documentElement.clientWidth, bad = [];
     for (const el of document.querySelector(scopeSel).querySelectorAll('*')) {
-      if (el.closest('.row-scroll, svg, [inert], [aria-hidden="true"]')) continue;
+      // .row-scroll and scrolling titles (marquee) are clipped by their own box on purpose
+      if (el.closest('.row-scroll, svg, [inert], [aria-hidden="true"], [data-marquee="moving"] > *')) continue;
       const cs = getComputedStyle(el);
       if (cs.visibility === 'hidden' || cs.display === 'none') continue;
       const r = el.getBoundingClientRect();
@@ -139,6 +140,8 @@ async function run() {
       check(h1 && h1.y >= vp.safe.top, 'populated home header clears the status bar');
       await noOverflow(page, '#main', 'home');
       check(await page.locator('main img').count() > 0, 'real artwork is rendered');
+      // Quick Picks shows as soon as the first song lands; the rest of the import may still be running.
+      await page.waitForFunction(() => document.querySelectorAll('[role="group"][aria-label="Moods"] button').length >= 3, null, { timeout: 8000 }).catch(() => {});
       check(await page.locator('[role="group"][aria-label="Moods"] button').count() === 3, 'mood chips appear only for moods backed by real tracks (Energize, Relax, Workout)');
       const quick = await page.locator('h2', { hasText: 'Quick Picks' }).first().boundingBox();
       check(quick && quick.y > 60, 'Quick Picks section is present below the header');
@@ -274,7 +277,14 @@ async function run() {
       await page.click(`${P} [aria-label="Show lyrics"]`);
       await page.waitForTimeout(1800);
       await shot(page, '7-lyrics');
-      const cur = await rect(page, `${P} [aria-current="true"]`);
+      // The 5 s test clip loops and has no lyric line in its first half second: take the measurement once a line is
+      // current and has had time to settle, retrying if the loop restarts in between.
+      let cur = null;
+      for (let tries = 0; tries < 4 && !cur; tries++) {
+        await page.waitForSelector(`${P} [aria-current="true"]`, { timeout: 4000 }).catch(() => {});
+        await page.waitForTimeout(700);
+        cur = await rect(page, `${P} [aria-current="true"]`);
+      }
       const box = await rect(page, `${P} [aria-label="Lyrics"]`);
       check(await page.locator(`${P} [data-line]`).count() === 5, 'synced lyrics from the imported .lrc file are shown');
       check(cur && box && Math.abs((cur.y + cur.h / 2) - (box.y + box.h / 2)) < box.h * 0.22, 'current lyric line is centred in the lyrics view', JSON.stringify({ cur, box }));
@@ -300,7 +310,7 @@ async function run() {
 
       // ---- Lyrics (plain .txt with a metadata header): clean, evenly readable, scrolls on its own ----
       for (let n = 0; n < 12; n++) {
-        const nowTitle = await page.locator(`${P} header .truncate`).last().innerText();
+        const nowTitle = await page.locator(`${P} [data-lyrics-header] [data-marquee]`).first().getAttribute('title');
         if (/Tide Study/.test(nowTitle)) break;
         await page.click(`${P} [aria-label="Next track"]`);
         await page.waitForTimeout(500);

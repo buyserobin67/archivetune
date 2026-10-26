@@ -67,7 +67,7 @@ input[type='range'].seek::-webkit-slider-runnable-track { transition: height var
 .seek-wrap[data-held] input[type='range'].seek::-webkit-slider-thumb { margin-top: -2.5px; transform: scale(1.4); }
 .seek-wrap[data-held] input[type='range'].seek::-moz-range-track, .seek-wrap[data-held] input[type='range'].seek::-moz-range-progress { height: 8px; }
 /* karaoke sweep on the sung lyric line (LyricsView); --k runs from -15% to 115% across each word */
-.karaoke { background-image: linear-gradient(90deg, var(--fg) calc(var(--k, -15%) - 15%), rgb(255 255 255 / 0.55) calc(var(--k, -15%) + 15%)); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.karaoke { display: inline-block; white-space: pre; background-image: linear-gradient(90deg, var(--fg) calc(var(--k, -15%) - 15%), rgb(255 255 255 / 0.55) calc(var(--k, -15%) + 15%)); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 /* Now Playing ambient background: large soft colour shapes that drift. Transform only, so it stays on the compositor. */
 .ambient-blob { position: absolute; width: 95vmax; height: 95vmax; border-radius: 50%; will-change: transform; animation: 26s ease-in-out infinite alternate; }
 .ambient-a { left: -35vmax; top: -30vmax; animation-name: drift-a; }
