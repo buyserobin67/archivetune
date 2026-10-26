@@ -92,3 +92,12 @@ describe('artwork border detection', () => {
     expect(scaleRect({ x: 10, y: 10, w: 999, h: 999 }, 100, 100, 200, 200)).toEqual({ x: 20, y: 20, w: 180, h: 180 });
   });
 });
+
+describe('lock-screen square', () => {
+  it('takes the same centred square the app shows', async () => {
+    const { centerSquare } = await import('./art');
+    expect(centerSquare(1280, 720)).toEqual({ x: 280, y: 0, s: 720 });
+    expect(centerSquare(600, 900)).toEqual({ x: 0, y: 150, s: 600 });
+    expect(centerSquare(500, 500)).toEqual({ x: 0, y: 0, s: 500 });
+  });
+});

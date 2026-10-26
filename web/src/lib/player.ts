@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { getArtUrl } from './art';
+import { getSquareArtUrl } from './art';
 import { db as defaultDb, getSetting, setSetting, type CadenceDB } from './db';
 import { markPlayed } from './library';
 import { gainToVolume, readLevelling, type Levelling } from './levelling';
@@ -462,7 +462,7 @@ export class Player {
   // ---- Media Session ----
   private async updateMetadata(track: Track) {
     if (!this.ms) return;
-    const art = track.hasArt ? await getArtUrl(track.id, this.db) : null;
+    const art = track.hasArt ? await getSquareArtUrl(track.id, this.db) : null;
     if (Q.currentId(this.state.queue) !== track.id) return;
     const src = art ?? this.fallbackArt;
     this.ms.metadata = this.makeMetadata({

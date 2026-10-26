@@ -217,6 +217,21 @@ try {
   check(await page.locator('main [data-disc]').count() === 2, 'an album over two discs shows Disc 1 and Disc 2');
   await shot('12-discs');
 
+  console.log('== lock-screen artwork');
+  await page.goto(`${URL}#/search`);
+  await page.getByPlaceholder('Songs, artists, albums').fill('Landscape');
+  await page.getByRole('button', { name: /^Play Landscape Cover/ }).first().click();
+  await page.waitForTimeout(1200);
+  const art = await page.evaluate(async () => {
+    const src = navigator.mediaSession?.metadata?.artwork?.[0]?.src;
+    if (!src) return null;
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    return { w: img.naturalWidth, h: img.naturalHeight };
+  });
+  check(!!art && art.w === art.h, 'a wide cover reaches the lock screen / Dynamic Island as the same square the app shows', JSON.stringify(art));
+
   console.log('== settings');
   await page.goto(`${URL}#/settings`);
   await page.waitForTimeout(500);
