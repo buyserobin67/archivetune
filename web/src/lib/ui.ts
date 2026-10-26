@@ -10,10 +10,12 @@ interface UIState {
   sheetTrackId: string | null;
   /** Album or artist whose long-press menu is open. */
   sheetGroup: { kind: 'albums' | 'artists'; key: string } | null;
+  /** Track whose cover is open in Crop cover. */
+  cropTrackId: string | null;
   pickerTrackIds: string[] | null;
 }
 
-let state: UIState = { playerOpen: false, playerTab: 'now', toast: null, sheetTrackId: null, sheetGroup: null, pickerTrackIds: null };
+let state: UIState = { playerOpen: false, playerTab: 'now', toast: null, sheetTrackId: null, sheetGroup: null, cropTrackId: null, pickerTrackIds: null };
 const listeners = new Set<() => void>();
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let toastId = 0;
@@ -45,6 +47,8 @@ export const ui = {
   openTrackSheet: (id: string) => set({ sheetTrackId: id }),
   openGroupSheet: (kind: 'albums' | 'artists', key: string) => set({ sheetGroup: { kind, key } }),
   closeGroupSheet: () => set({ sheetGroup: null }),
+  openCrop: (id: string) => set({ cropTrackId: id, sheetTrackId: null }),
+  closeCrop: () => set({ cropTrackId: null }),
   closeTrackSheet: () => set({ sheetTrackId: null }),
   openPlaylistPicker: (ids: string[]) => set({ pickerTrackIds: ids }),
   closePlaylistPicker: () => set({ pickerTrackIds: null }),

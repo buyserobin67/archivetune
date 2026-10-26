@@ -232,6 +232,87 @@ try {
   });
   check(!!art && art.w === art.h, 'a wide cover reaches the lock screen / Dynamic Island as the same square the app shows', JSON.stringify(art));
 
+  console.log('== look: glass, ambient, glow, marquee');
+  check(await page.locator('nav[aria-label="Primary"] ul.glass').count() === 1 && await page.locator('[data-miniplayer].glass').count() === 1, 'tab bar and mini-player use the frosted glass surface');
+  const blur = await page.evaluate(() => getComputedStyle(document.querySelector('nav[aria-label="Primary"] ul')).backdropFilter || getComputedStyle(document.querySelector('nav[aria-label="Primary"] ul')).webkitBackdropFilter);
+  check(/blur/.test(blur ?? ''), 'the glass really blurs what is behind it', String(blur));
+  await page.getByPlaceholder('Songs, artists, albums').fill('A Very Long');
+  await page.getByRole('button', { name: /^Play A Very Long/ }).first().click();
+  await page.waitForTimeout(600);
+  await page.click('[aria-label^="Open player"]');
+  await page.waitForTimeout(900);
+  if (await page.locator(`${P} [aria-label="Hide queue"]`).count()) await page.click(`${P} [aria-label="Hide queue"]`);
+  if (await page.locator(`${P} [aria-label="Hide lyrics"]`).count()) await page.click(`${P} [aria-label="Hide lyrics"]`);
+  await page.waitForTimeout(500);
+  check(await page.locator(`${P} [data-marquee="moving"]`).count() === 1, 'a title too long for one line scrolls instead of being cut off');
+  check(await page.locator(`${P} [data-ambient] .ambient-blob`).count() >= 3, 'Now Playing has the drifting colour background');
+  const anim = await page.evaluate((s) => getComputedStyle(document.querySelector(`${s} .ambient-blob`)).animationName, P);
+  check(anim !== 'none', 'the background moves', anim);
+  const glow = await page.evaluate((s) => getComputedStyle(document.querySelector(`${s} [data-cover]`)).boxShadow, P);
+  check(/rgba?\(/.test(glow) && glow !== 'none', 'the cover casts a glow in its own colour', glow.slice(0, 60));
+  await shot('14-now-playing-look');
+  await page.click(`${P} [aria-label^="Go to The Extraordinarily"]`);
+  await page.waitForTimeout(900);
+  check(/#\/library\/artists\//.test(page.url()) && await page.locator(`${P}`).count() === 0, 'tapping the artist closes the player and opens the artist', page.url());
+
+  console.log('== album page');
+  await page.goto(`${URL}#/library/albums`);
+  await page.waitForTimeout(500);
+  await page.locator('main a[href*="albums/"]', { hasText: 'Afterglow' }).first().click();
+  await page.waitForTimeout(800);
+  const hero = await rect('main [data-hero-cover]');
+  check(hero && hero.x <= 1 && hero.width >= 400, 'the album cover runs edge to edge', JSON.stringify(hero));
+  check(await page.locator('[data-compact-header]').evaluate((e) => getComputedStyle(e).opacity) === '0', 'the compact header is hidden at the top');
+  await shot('15-album-top');
+  await page.setViewportSize({ width: 402, height: 560 }); // the fixture album is short: give it room to scroll
+  await page.waitForTimeout(300);
+  await page.evaluate(() => document.getElementById('main').scrollTo({ top: 10_000 }));
+  await page.waitForTimeout(600);
+  check(await page.locator('[data-compact-header]').evaluate((e) => getComputedStyle(e).opacity) === '1', 'scrolling shows the compact header with the title');
+  await shot('16-album-scrolled');
+  await page.setViewportSize({ width: 402, height: 874 });
+
+  console.log('== crop cover');
+  await page.goto(`${URL}#/search`);
+  await page.getByPlaceholder('Songs, artists, albums').fill('Landscape');
+  await page.waitForTimeout(400);
+  await page.locator('main [aria-label^="More actions for Landscape"]').first().click();
+  await page.getByRole('button', { name: 'Crop cover' }).click();
+  await page.waitForSelector('[data-crop-frame] img', { timeout: 5000 });
+  const f = await rect('[data-crop-frame]');
+  await page.mouse.move(f.x + f.width / 2, f.y + f.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(f.x + f.width / 2 + 120, f.y + f.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await page.getByRole('slider', { name: 'Zoom' }).fill('1.5');
+  await page.waitForTimeout(200);
+  await shot('17-crop');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await page.waitForTimeout(1200);
+  const editRow = await page.evaluate(() => new Promise((ok) => { const r = indexedDB.open('cadence'); r.onsuccess = () => { const q = r.result.transaction('artEdits').objectStore('artEdits').getAll(); q.onsuccess = () => { r.result.close(); ok(q.result.filter((e) => e.kind === 'manual').map((e) => e.rect)); }; }; }));
+  check(editRow.length === 1 && editRow[0].w === editRow[0].h && editRow[0].x < 280, 'Crop cover saves the chosen square (dragged left of centre, zoomed in)', JSON.stringify(editRow));
+  check(await page.getByRole('dialog').count() === 0, 'the crop sheet closes after saving');
+
+  console.log('== name clean-up');
+  await page.evaluate(() => new Promise((ok, no) => {
+    const r = indexedDB.open('cadence');
+    r.onsuccess = () => {
+      const db = r.result, tx = db.transaction('tracks', 'readwrite'), st = tx.objectStore('tracks');
+      const q = st.getAll();
+      q.onsuccess = () => { const t = q.result.find((x) => x.title === 'Tide Study'); if (t) st.put({ ...t, title: 'Nova Vale - Tide Study (Official Video)', artist: 'Nova Vale - Topic' }); };
+      tx.oncomplete = () => { db.close(); ok(); }; tx.onerror = () => no(tx.error);
+    };
+  }));
+  await page.goto(`${URL}#/library/songs`);
+  await page.reload();
+  await page.waitForTimeout(800);
+  const listText = await page.locator('main').innerText();
+  check(/Tide Study/.test(listText) && !/Official Video|- Topic/.test(listText), 'songs show without "- Topic" and "(Official Video)"');
+  await page.getByRole('button', { name: /^Play Tide Study/ }).first().click();
+  await page.waitForTimeout(800);
+  const meta = await page.evaluate(() => ({ title: navigator.mediaSession?.metadata?.title, artist: navigator.mediaSession?.metadata?.artist }));
+  check(meta.title === 'Tide Study' && meta.artist === 'Nova Vale', 'the lock screen gets the clean names too', JSON.stringify(meta));
+
   console.log('== settings');
   await page.goto(`${URL}#/settings`);
   await page.waitForTimeout(500);

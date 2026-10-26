@@ -4,6 +4,7 @@ import { Art } from '../components/Art';
 import { ChevronLeft, ChevronRight, ShareIcon } from '../components/Icons';
 import { renderRecapCard, shareOrSave } from '../lib/recapCard';
 import { ui } from '../lib/ui';
+import { displayEvent } from '../lib/names';
 import { StatsSaver } from '../components/StatsSaver';
 import { db } from '../lib/db';
 import { getPlayer } from '../lib/player';
@@ -78,7 +79,8 @@ export default function Recap() {
   const [offset, setOffset] = useState(0);
   const now = useMemo(() => Date.now(), []);
   const range = rangeFor(period, now, offset);
-  const events = useLiveQuery(() => db.plays.where('at').between(range.start, range.end, true, false).toArray(), [range.start, range.end]);
+  // Older listens were logged with uncleaned names: clean them the same way so one artist is not counted twice.
+  const events = useLiveQuery(() => db.plays.where('at').between(range.start, range.end, true, false).toArray().then((l) => l.map((e) => displayEvent(e))), [range.start, range.end]);
   const all = useLiveQuery(() => db.plays.orderBy('at').toArray(), []);
   const recap = useMemo(() => computeRecap(events ?? [], period, now, offset), [events, period, now, offset]);
   const streak = useMemo(() => currentStreak(all ?? []), [all]);

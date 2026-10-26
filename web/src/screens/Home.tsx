@@ -11,6 +11,7 @@ import { useTracks } from '../lib/hooks';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import { computeRecap, formatListening } from '../lib/stats';
+import { displayEvent } from '../lib/names';
 import { Chip, RoundButton } from './common';
 
 export default function Home() {
@@ -18,7 +19,7 @@ export default function Home() {
   const nav = useNavigate();
   const p = getPlayer();
   const [mood, setMood] = useState<MoodId | null>(null);
-  const week = useLiveQuery(() => db.plays.where('at').aboveOrEqual(Date.now() - 8 * 86_400_000).toArray(), []);
+  const week = useLiveQuery(() => db.plays.where('at').aboveOrEqual(Date.now() - 8 * 86_400_000).toArray().then((l) => l.map((e) => displayEvent(e))), []);
   const weekRecap = useMemo(() => computeRecap(week ?? [], 'week'), [week]);
   // The recap card waits for the first counted listen: before that it would only advertise an empty screen.
   const anyPlays = useLiveQuery(() => db.plays.limit(1).count().then((n) => n > 0), []);

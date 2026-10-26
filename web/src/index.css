@@ -68,6 +68,25 @@ input[type='range'].seek::-webkit-slider-runnable-track { transition: height var
 .seek-wrap[data-held] input[type='range'].seek::-moz-range-track, .seek-wrap[data-held] input[type='range'].seek::-moz-range-progress { height: 8px; }
 /* karaoke sweep on the sung lyric line (LyricsView); --k runs from -15% to 115% across each word */
 .karaoke { background-image: linear-gradient(90deg, var(--fg) calc(var(--k, -15%) - 15%), rgb(255 255 255 / 0.55) calc(var(--k, -15%) + 15%)); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* Now Playing ambient background: large soft colour shapes that drift. Transform only, so it stays on the compositor. */
+.ambient-blob { position: absolute; width: 95vmax; height: 95vmax; border-radius: 50%; will-change: transform; animation: 26s ease-in-out infinite alternate; }
+.ambient-a { left: -35vmax; top: -30vmax; animation-name: drift-a; }
+.ambient-b { right: -40vmax; top: 5vmax; animation-name: drift-b; animation-duration: 33s; }
+.ambient-c { left: -15vmax; bottom: -55vmax; animation-name: drift-c; animation-duration: 41s; }
+.ambient-paused .ambient-blob { animation-play-state: paused; }
+@keyframes drift-a { from { transform: translate(0, 0) scale(1); } to { transform: translate(18vmax, 14vmax) scale(1.15); } }
+@keyframes drift-b { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-16vmax, 20vmax) scale(.92); } }
+@keyframes drift-c { from { transform: translate(0, 0) scale(.95); } to { transform: translate(14vmax, -18vmax) scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .ambient-blob { animation: none; } }
+/* Marquee: hold at the start, then one slow pass; the second copy makes the loop seamless. */
+.marquee { animation: marquee linear infinite; will-change: transform; }
+@keyframes marquee { 0%, 18% { transform: translateX(0); } 100% { transform: translateX(var(--dist)); } }
+/* Frosted glass, iOS 26 style. Only on the two fixed bars at the bottom (never on anything that scrolls). Without
+   backdrop-filter support the bars fall back to solid surfaces. */
+.glass { background-color: rgb(30 32 35 / 0.94); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background-color: rgb(30 32 35 / 0.58); -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); box-shadow: inset 0 0.5px 0 rgb(255 255 255 / 0.14), var(--shadow-float); }
+}
 /* long-press targets: no iOS callout or text selection */
 .hold { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 input[type='range'].seek::-moz-range-track { height: 5px; border-radius: 5px; background: rgb(255 255 255 / 0.2); }

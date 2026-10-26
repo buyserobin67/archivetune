@@ -3,10 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { artVersion, getArtUrl, subscribeArt } from './art';
 import { getStorageStatus, type StorageStatus } from './storage';
+import { displayTrack } from './names';
 import type { Playlist, Track } from './types';
 
 export function useTracks(): Track[] | undefined {
-  return useLiveQuery(() => db.tracks.orderBy('title').toArray(), []);
+  // Names are cleaned for display here, once, so every screen agrees (grouping, search, Go to artist).
+  return useLiveQuery(() => db.tracks.orderBy('title').toArray().then((all) => all.map((t) => displayTrack(t))), []);
 }
 
 export function usePlaylists(): Playlist[] | undefined {

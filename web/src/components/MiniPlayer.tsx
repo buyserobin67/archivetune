@@ -64,8 +64,8 @@ export function MiniPlayer() {
     <div className="px-3 pb-1.5">
       <div
         ref={card}
-        className="relative mx-auto max-w-md overflow-hidden rounded-2xl shadow-float"
-        style={{ background: 'linear-gradient(100deg, color-mix(in srgb, rgb(var(--art-rgb)) 16%, var(--surface-2)), var(--surface-2) 75%)', touchAction: 'none' }}
+        className="glass relative mx-auto max-w-md overflow-hidden rounded-2xl"
+        style={{ backgroundImage: 'linear-gradient(100deg, rgb(var(--art-rgb) / .2), transparent 75%)', touchAction: 'none' }}
         onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd} onTouchCancel={onEnd} onClickCapture={swallowClickAfterDrag}
         data-miniplayer
       >

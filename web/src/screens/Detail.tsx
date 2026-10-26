@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import { Art, FallbackCover } from '../components/Art';
-import { PlayIcon, ShuffleIcon, TrashIcon } from '../components/Icons';
+import { ChevronLeft, PlayIcon, ShuffleIcon, TrashIcon } from '../components/Icons';
 import { TrackRow } from '../components/TrackRow';
 import { groupAlbums, groupArtists } from '../lib/library';
 import { useArtPalette } from '../lib/accent';
@@ -20,19 +20,60 @@ function Hero({ back, trackId, seed, title, meta, round, children, collage }: {
   back: string; trackId?: string; seed: string; title: string; meta: string; round?: boolean; children?: React.ReactNode; collage?: Track[];
 }) {
   const palette = useArtPalette(trackId, seed);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [compact, setCompact] = useState(false);
+  // The small header fades in once the big title has scrolled under the status bar.
+  useEffect(() => {
+    const el = titleRef.current, root = document.getElementById('main');
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    // The header covers the status bar / Dynamic Island plus its own row, so that is where the title counts as gone.
+    const sat = safeTop();
+    const line = Math.round(sat + 52);
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting && e.boundingClientRect.top < line), { root, rootMargin: `-${line}px 0px 0px 0px` });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const tint = `rgb(${rgbCss(palette.tint)})`;
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[30rem]" aria-hidden="true"
-        style={{ background: `radial-gradient(110% 70% at 50% 0%, rgb(${rgbCss(palette.accent)} / .26), transparent 72%), linear-gradient(to bottom, rgb(${rgbCss(palette.tint)} / .45), transparent 85%)` }} />
-      <BackBar to={back} />
-      <div className="relative flex flex-col items-center px-gutter pb-5 pt-3 text-center">
-        <div className={`aspect-square w-[min(12rem,55vw)] overflow-hidden shadow-art ${round ? 'rounded-full' : 'rounded-xl'}`}>
+      <CompactHeader back={back} title={title} show={compact} />
+      <div className="absolute left-0 right-0 top-0 z-10"><BackBar to={back} /></div>
+      {/* Edge-to-edge cover that fades into the page, like an album page in Apple Music. */}
+      <div className="relative mx-auto w-full max-w-md" data-hero-cover>
+        <div className="aspect-square w-full overflow-hidden" data-round={round ? '' : undefined}>
           {collage ? <Collage tracks={collage} seed={seed} /> : <Art trackId={trackId} seed={seed} className="h-full w-full" rounded="rounded-none" priority />}
         </div>
-        <h1 className="mt-4 line-clamp-2 max-w-full text-title-lg font-bold">{title}</h1>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5" aria-hidden="true" style={{ background: `linear-gradient(to bottom, transparent, ${tint} 70%, var(--bg))` }} />
+      </div>
+      <div className="relative -mt-16 flex flex-col items-center px-gutter pb-5 text-center" style={{ background: `linear-gradient(to bottom, transparent, var(--bg) 4rem)` }}>
+        <h1 ref={titleRef} className="line-clamp-2 max-w-full text-title-lg font-bold drop-shadow-[0_2px_12px_rgb(0_0_0/.5)]">{title}</h1>
         <div className="mt-0.5 text-footnote text-fg-2">{meta}</div>
         {children}
       </div>
+    </div>
+  );
+}
+
+/** The top safe-area inset in px (--sat is an env() expression, so it has to be resolved through a real element). */
+function safeTop(): number {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;visibility:hidden;padding-top:var(--sat)';
+  document.body.appendChild(probe);
+  const px = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  probe.remove();
+  return px;
+}
+
+/** Small frosted header with back button and title, shown while the hero is scrolled away. */
+function CompactHeader({ back, title, show }: { back: string; title: string; show: boolean }) {
+  const nav = useNavigate();
+  return (
+    <div className={`glass fixed inset-x-0 top-0 z-20 flex items-center gap-2 rounded-none px-gutter pb-2 transition-opacity duration-fast ${show ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+      style={{ paddingTop: 'calc(var(--sat) + 0.375rem)', boxShadow: 'inset 0 -0.5px 0 rgb(255 255 255 / .08)' }} aria-hidden={!show} data-compact-header>
+      <button className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10" aria-label="Back" tabIndex={show ? 0 : -1}
+        onClick={() => (window.history.length > 1 ? nav(-1) : nav(back))}><ChevronLeft size={22} /></button>
+      <div className="min-w-0 flex-1 truncate text-center text-body font-semibold">{title}</div>
+      <span className="h-9 w-9 shrink-0" aria-hidden="true" />
     </div>
   );
 }

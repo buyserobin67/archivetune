@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CadenceDB } from './db';
-import { autoTrimAll, autoTrimNew, analyzeTrack, trimTrack, undoAll, useOriginal, type ArtProcessor, AUTO_TRIM_KEY } from './artEdits';
+import { autoTrimAll, autoTrimNew, analyzeTrack, cropTrack, trimTrack, undoAll, useOriginal, type ArtProcessor, AUTO_TRIM_KEY } from './artEdits';
 import { getArtBlob, getOriginalArtBlob } from './artSource';
 import { deleteTrack, importFile } from './library';
 import { audioFile, fakeParser, makeDb } from '../test/helpers';
@@ -146,5 +146,22 @@ describe('non-destructive artwork trimming', () => {
     expect(await (await v3.art.get('old'))!.blob.text()).toBe('img');
     expect(await v3.lyrics.count()).toBe(1);
     expect(await v3.artEdits.count()).toBe(0);
+  });
+});
+
+describe('manual square crop', () => {
+  it('saves the chosen square as a copy, keeps the original, survives auto trim, and can be undone', async () => {
+    const db = makeDb();
+    const original = spec({ w: 1280, h: 720 });
+    const id = await withCover(db, 'wide.mp3', original);
+    expect(await cropTrack(id, fake, { x: 300.4, y: 0, w: 720, h: 720 }, db)).toBe(true);
+    const shown = await read((await getArtBlob(id, db))!);
+    expect(shown.cropped).toEqual({ x: 300, y: 0, w: 720, h: 720 });
+    expect(await (await getOriginalArtBlob(id, db))!.text()).toBe(await original.text());
+    expect((await db.artEdits.get(id))!).toMatchObject({ kind: 'manual', from: { w: 1280, h: 720 }, to: { w: 720, h: 720 } });
+    await autoTrimAll(fake, { db });
+    expect((await db.artEdits.get(id))!.kind).toBe('manual');
+    await useOriginal(id, db);
+    expect(await (await getArtBlob(id, db))!.text()).toBe(await original.text());
   });
 });

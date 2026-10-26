@@ -4,6 +4,7 @@ import { Dock } from './components/Dock';
 import { UpdateBanner } from './components/UpdateBanner';
 import { NowPlaying } from './components/NowPlaying';
 import { GroupSheet, PlaylistPicker, TrackSheet } from './components/Sheets';
+import { CropSheet } from './components/CropSheet';
 import Home from './screens/Home';
 import Library from './screens/Library';
 import { GroupDetail, PlaylistDetail } from './screens/Detail';
@@ -37,6 +38,7 @@ export default function App() {
       <NowPlaying />
       <TrackSheet />
       <GroupSheet />
+      <CropSheet />
       <PlaylistPicker />
     </div>
   );

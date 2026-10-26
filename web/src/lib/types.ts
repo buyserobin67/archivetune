@@ -109,7 +109,8 @@ export interface ParsedMeta {
 export interface ArtEdit {
   trackId: string;
   blob?: Blob;
-  kind: 'transparent' | 'flat' | 'clean';
+  /** 'manual' = the user chose the square themselves (Crop cover). */
+  kind: 'transparent' | 'flat' | 'clean' | 'manual';
   disabled?: boolean;
   /** Trim rectangle in source pixels. */
   rect?: { x: number; y: number; w: number; h: number };

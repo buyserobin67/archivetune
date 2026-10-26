@@ -49,4 +49,5 @@ export const AlbumIcon = (p: P) => stroke(<><circle cx="12" cy="12" r="9" /><cir
 export const ArtistIcon = (p: P) => stroke(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>, p);
 export const GripIcon = (p: P) => stroke(<><path d="M5 9h14" /><path d="M5 15h14" /></>, p);
 export const ShareIcon = (p: P) => stroke(<><path d="M12 3v12" /><path d="m7 8 5-5 5 5" /><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></>, p);
+export const CropIcon = (p: P) => stroke(<><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M18 22V8a2 2 0 0 0-2-2H2" /></>, p);
 export const TimingIcon = (p: P) => stroke(<><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M10 2h4" /></>, p);

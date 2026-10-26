@@ -3,6 +3,7 @@ import { getSquareArtUrl } from './art';
 import { db as defaultDb, getSetting, setSetting, type CadenceDB } from './db';
 import { markPlayed } from './library';
 import { gainToVolume, readLevelling, type Levelling } from './levelling';
+import { displayTrack } from './names';
 import { dbListenWriters, ListenTracker } from './stats';
 import * as Q from './queue';
 import type { RepeatMode, Track } from './types';
@@ -223,7 +224,9 @@ export class Player {
     this.prepared = null;
     this.preparing = null;
     // A prefetched next song skips the database read, which is most of the gap between songs on a phone.
-    const [track, blobRow] = ready ? [ready.track, { trackId: id, blob: ready.blob }] : await Promise.all([this.db.tracks.get(id), this.db.blobs.get(id)]);
+    const [rawTrack, blobRow] = ready ? [ready.track, { trackId: id, blob: ready.blob }] : await Promise.all([this.db.tracks.get(id), this.db.blobs.get(id)]);
+    // Display names everywhere the system shows them: lock screen, Dynamic Island, the listening log.
+    const track = displayTrack(rawTrack);
     if (token !== this.loadToken) return; // superseded by a newer request
     if (!track) {
       this.set({ queue: Q.removeAt(this.state.queue, this.state.queue.index), loading: false });
@@ -274,6 +277,11 @@ export class Player {
 
   private applyVolume(track: Track) {
     try { this.audio.volume = gainToVolume(track.gain, this.levelling); } catch { /* read-only on iOS */ }
+  }
+
+  /** Call after a track's cover changed so the lock screen and Dynamic Island show the new one. */
+  refreshArtwork(trackId: string) {
+    if (this.state.track?.id === trackId) void this.updateMetadata(this.state.track);
   }
 
   setLevelling(mode: Levelling) {

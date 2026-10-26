@@ -7,11 +7,12 @@ import { forgetArt } from '../lib/art';
 import { getPlayer } from '../lib/player';
 import { addToPlaylist, createPlaylist } from '../lib/playlists';
 import { usePlaylists, useTracks } from '../lib/hooks';
+import { displayTrack } from '../lib/names';
 import { formatBytes, formatTime } from '../lib/storage';
 import { ui, useUI } from '../lib/ui';
 import { browserArtProcessor, trimTrack, useOriginal } from '../lib/artEdits';
 import { Art } from './Art';
-import { AlbumIcon, ArtistIcon, CheckIcon, HeartIcon, NoteIcon, PlayIcon, PlusIcon, QueueIcon, ShuffleIcon, TrashIcon } from './Icons';
+import { AlbumIcon, ArtistIcon, CropIcon, CheckIcon, HeartIcon, NoteIcon, PlayIcon, PlusIcon, QueueIcon, ShuffleIcon, TrashIcon } from './Icons';
 
 const albumKey = (t: { album: string; artist: string }) => `${t.album}\u0000${t.artist}`;
 
@@ -49,7 +50,7 @@ export function SheetItem({ icon, label, onClick, danger, detail, selected }: { 
 
 export function TrackSheet() {
   const { sheetTrackId } = useUI();
-  const track = useLiveQuery(() => (sheetTrackId ? db.tracks.get(sheetTrackId) : undefined), [sheetTrackId]);
+  const track = useLiveQuery(() => (sheetTrackId ? db.tracks.get(sheetTrackId).then((t) => displayTrack(t)) : undefined), [sheetTrackId]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => setConfirmDelete(false), [sheetTrackId]);
   const artEdit = useLiveQuery(() => (sheetTrackId ? db.artEdits.get(sheetTrackId) : undefined), [sheetTrackId]);
@@ -73,10 +74,11 @@ export function TrackSheet() {
       <SheetItem icon={<PlusIcon size={20} />} label="Add to playlist" onClick={() => { close(); ui.openPlaylistPicker([track.id]); }} />
       {track.album !== 'Unknown Album' && <SheetItem icon={<AlbumIcon size={20} />} label="Go to album" onClick={() => go(`/library/albums/${encodeURIComponent(albumKey(track))}`)} />}
       {track.artist !== 'Unknown Artist' && <SheetItem icon={<ArtistIcon size={20} />} label="Go to artist" onClick={() => go(`/library/artists/${encodeURIComponent(track.artist)}`)} />}
+      {track.hasArt && browserArtProcessor && <SheetItem icon={<CropIcon size={20} />} label="Crop cover" onClick={() => ui.openCrop(track.id)} />}
       {track.hasArt && browserArtProcessor && (artEdit?.blob && !artEdit.disabled ? (
-        <SheetItem icon={<NoteIcon size={20} />} label="Use original artwork" onClick={async () => { await useOriginal(track.id); ui.toast('Using the original artwork'); close(); }} />
+        <SheetItem icon={<NoteIcon size={20} />} label="Use original artwork" onClick={async () => { await useOriginal(track.id); getPlayer().refreshArtwork(track.id); ui.toast('Using the original artwork'); close(); }} />
       ) : (
-        <SheetItem icon={<NoteIcon size={20} />} label="Trim artwork borders" onClick={async () => { const r = await trimTrack(track.id, browserArtProcessor!, { flat: true }); ui.toast(r === 'trimmed' ? 'Artwork trimmed (original kept)' : r === 'clean' ? 'No borders found' : 'Could not trim'); close(); }} />
+        <SheetItem icon={<NoteIcon size={20} />} label="Trim artwork borders" onClick={async () => { const r = await trimTrack(track.id, browserArtProcessor!, { flat: true }); getPlayer().refreshArtwork(track.id); ui.toast(r === 'trimmed' ? 'Artwork trimmed (original kept)' : r === 'clean' ? 'No borders found' : 'Could not trim'); close(); }} />
       ))}
       {track.license && (
         <div className="my-2 rounded-lg bg-s3 p-3 text-footnote leading-relaxed text-fg-2">

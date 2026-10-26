@@ -19,6 +19,7 @@ import { ScreenHeader } from './common';
 import { canSetVolume, LEVELLING_KEY, readLevelling, type Levelling } from '../lib/levelling';
 import { getPlayer } from '../lib/player';
 import { haptic, HAPTICS_KEY, hapticsOn } from '../lib/haptics';
+import { CLEAN_NAMES_KEY, cleanNamesOn } from '../lib/names';
 
 const SWITCH = 'h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-s3 transition-colors checked:bg-fg [&::before]:block [&::before]:h-5 [&::before]:w-5 [&::before]:translate-x-0.5 [&::before]:translate-y-0.5 [&::before]:rounded-full [&::before]:bg-white [&::before]:transition-transform checked:[&::before]:translate-x-[1.375rem] checked:[&::before]:bg-black';
 const LEVELS: [Levelling, string][] = [['off', 'Off'], ['track', 'Track'], ['album', 'Album']];
@@ -129,12 +130,17 @@ export default function Settings() {
         </Link>
       </Group>
 
-      <Group title="Appearance" footer="Off keeps the calm white accent. On, buttons and highlights take a light tone from the current cover.">
+      <Group title="Appearance" footer="Accent: off keeps the calm white accent; on, buttons and highlights take a light tone from the current cover. Clean up names hides video-site extras like “- Topic”, “VEVO” and “(Official Video)” everywhere, including the lock screen. Your files are not changed; a change applies when Cadence next opens.">
         <label className="flex items-center justify-between gap-4 text-body font-medium">
           Accent from artwork
           <input type="checkbox" role="switch" className="h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-s3 transition-colors checked:bg-fg [&::before]:block [&::before]:h-5 [&::before]:w-5 [&::before]:translate-x-0.5 [&::before]:translate-y-0.5 [&::before]:rounded-full [&::before]:bg-white [&::before]:transition-transform checked:[&::before]:translate-x-[1.375rem] checked:[&::before]:bg-black"
             defaultChecked={artAccentOn()} aria-label="Accent from artwork"
             onChange={(e) => { try { localStorage.setItem(ART_ACCENT_KEY, String(e.target.checked)); } catch { /* ignore */ } refreshAccent(); }} />
+        </label>
+        <label className="mt-4 flex items-center justify-between gap-4 text-body font-medium">
+          Clean up names
+          <input type="checkbox" role="switch" className={SWITCH} defaultChecked={cleanNamesOn()} aria-label="Clean up names"
+            onChange={(e) => { try { localStorage.setItem(CLEAN_NAMES_KEY, String(e.target.checked)); } catch { /* ignore */ } ui.toast('Applies when Cadence next opens'); }} />
         </label>
       </Group>
 

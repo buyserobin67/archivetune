@@ -10,6 +10,7 @@ import { getPlayer, usePlayer, usePlaybackTime } from '../lib/player';
 import { haptic } from '../lib/haptics';
 import { useTracks } from '../lib/hooks';
 import { similarTo } from '../lib/similar';
+import { displayTrack } from '../lib/names';
 import { rgbCss, type Palette } from '../lib/palette';
 import { formatRemaining, formatTime } from '../lib/storage';
 import { supportsViewTransitions, ui, useUI } from '../lib/ui';
@@ -17,6 +18,8 @@ import type { Track } from '../lib/types';
 import { Art } from './Art';
 import { LyricsView, PasteLyricsSheet, useLyricFilePicker } from './LyricsView';
 import { SeekBar } from './SeekBar';
+import { Marquee } from './Marquee';
+import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetItem } from './Sheets';
 import { ToastBubble } from './Toast';
 import {
@@ -29,8 +32,11 @@ const DISMISS_VELOCITY = 0.55; // px per ms
 
 type Touchy = { onStart: (e: React.TouchEvent) => void; onMove: (e: React.TouchEvent) => void; onEnd: () => void };
 
-/** Flat charcoal with a faint artwork tint. The lyrics view adds a soft blurred cover. Cross-fades between tracks. */
-function Backdrop({ palette, trackId, blur }: { palette: Palette; trackId?: string; blur: boolean }) {
+/**
+ * Charcoal with soft colour shapes from the cover that drift slowly (transform-only, paused while the player is closed
+ * and with Reduce Motion). The lyrics view adds a soft blurred cover. Cross-fades between tracks.
+ */
+function Backdrop({ palette, trackId, blur, live }: { palette: Palette; trackId?: string; blur: boolean; live: boolean }) {
   const thumb = useArtThumb(blur ? trackId : undefined);
   const [layers, setLayers] = useState([{ id: 0, palette, thumb }]);
   const last = useRef(palette);
@@ -43,9 +49,12 @@ function Backdrop({ palette, trackId, blur }: { palette: Palette; trackId?: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [palette, thumb]);
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-bg" aria-hidden="true">
+    <div className={`pointer-events-none absolute inset-0 overflow-hidden bg-bg ${live ? '' : 'ambient-paused'}`} aria-hidden="true" data-ambient>
       {layers.map((l, i) => (
         <div key={l.id} className={`absolute inset-0 ${i > 0 ? 'animate-fade' : ''}`} style={{ animationDuration: '700ms' }}>
+          <span className="ambient-blob ambient-a" style={{ background: `radial-gradient(closest-side, rgb(${rgbCss(l.palette.accent)} / .55), transparent)` }} />
+          <span className="ambient-blob ambient-b" style={{ background: `radial-gradient(closest-side, rgb(${rgbCss(l.palette.accent2)} / .45), transparent)` }} />
+          <span className="ambient-blob ambient-c" style={{ background: `radial-gradient(closest-side, rgb(${rgbCss(l.palette.accentText)} / .22), transparent)` }} />
           {l.thumb && <img src={l.thumb} alt="" className="absolute inset-0 h-full w-full scale-[1.8] object-cover opacity-40 blur-2xl saturate-125" />}
           <div className="absolute inset-0" style={{ background: `radial-gradient(130% 60% at 50% -8%, rgb(${rgbCss(l.palette.accent)} / ${blur ? 0.3 : 0.22}), transparent 72%), linear-gradient(to bottom, transparent 40%, rgb(16 18 20 / ${blur ? 0.7 : 0.9}) 100%)` }} />
         </div>
@@ -111,7 +120,7 @@ export function NowPlaying() {
         willChange: 'transform',
       } as React.CSSProperties}
     >
-      <Backdrop palette={palette} trackId={t?.hasArt ? t.id : undefined} blur={playerTab === 'lyrics'} />
+      <Backdrop palette={palette} trackId={t?.hasArt ? t.id : undefined} blur={playerTab === 'lyrics'} live={open} />
       {open && <ToastBubble className="absolute inset-x-0 z-10 px-4" style={{ top: 'calc(var(--sat) + 3.75rem)' }} />}
       {t && (
         <div className="relative flex min-h-0 flex-1 flex-col">
@@ -125,14 +134,16 @@ export function NowPlaying() {
 }
 
 /** Compact header: collapse button, track context, and a spacer (or action) to keep the title centred. */
-function Header({ eyebrow, title, touch, left, right }: { eyebrow: string; title: string; touch: Touchy; left?: React.ReactNode; right?: React.ReactNode }) {
+function Header({ eyebrow, title, touch, left, right, onTitle }: { eyebrow: string; title: string; touch: Touchy; left?: React.ReactNode; right?: React.ReactNode; onTitle?: () => void }) {
   return (
     <header className="relative shrink-0 px-gutter pb-2" style={{ paddingTop: 'calc(var(--sat) + 0.5rem)', touchAction: 'none' }} onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd}>
       <div className="flex items-center justify-between gap-2">
         {left ?? <CircleButton label="Close player" onClick={() => { haptic(); ui.closePlayer(); }}><ChevronDown size={22} /></CircleButton>}
         <div className="min-w-0 flex-1 text-center">
           <div className="eyebrow truncate">{eyebrow}</div>
-          <div className="truncate text-footnote font-semibold">{title}</div>
+          {onTitle
+            ? <button className="press max-w-full truncate text-footnote font-semibold" onClick={onTitle} aria-label={`Go to ${title}`}>{title}</button>
+            : <div className="truncate text-footnote font-semibold">{title}</div>}
         </div>
         {right ?? <span className="h-9 w-9 shrink-0" aria-hidden="true" />}
       </div>
@@ -150,24 +161,32 @@ function NowTab({ track, touch }: { track: Track; touch: Touchy }) {
   const s = usePlayer();
   const fav = useLiveQuery(() => db.tracks.get(track.id).then((t) => t?.favorite === 1), [track.id]);
   const { playerOpen } = useUI();
+  const nav = useNavigate();
+  const go = (to: string) => { ui.closePlayer(); nav(to); };
+  const toArtist = track.artist !== 'Unknown Artist' ? () => go(`/library/artists/${encodeURIComponent(track.artist)}`) : undefined;
+  const toAlbum = track.album !== 'Unknown Album' ? () => go(`/library/albums/${encodeURIComponent(`${track.album}\u0000${track.artist}`)}`) : toArtist;
   return (
     <>
-      <Header eyebrow="Playing from" title={track.album === 'Unknown Album' ? track.artist : track.album} touch={touch} />
+      <Header eyebrow="Playing from" title={track.album === 'Unknown Album' ? track.artist : track.album} touch={touch} onTitle={toAlbum} />
       {/* Cover + title are one group, centred in the free space. The cover is capped (20rem, 42% of the height) so tall phones don't get a giant cover. */}
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-gutter" style={{ touchAction: 'none', ['--cw' as string]: 'min(100%, 20rem)' }} onTouchStart={touch.onStart} onTouchMove={touch.onMove} onTouchEnd={touch.onEnd} onTouchCancel={touch.onEnd}>
         {/* my-auto centres the group when there is room and lets it scroll (instead of overlapping the controls) when text is very large. */}
         <div className="my-auto flex w-full flex-col items-center gap-4 py-2">
         {/* Resuming springs back with a small overshoot; pausing settles without one. Durations follow the motion tokens, so reduced motion turns this off. */}
-        <div className="w-[min(var(--cw),42dvh,max(7.5rem,calc(100dvh-22rem-var(--sat)-var(--sab))))]" style={{
+        <div className="w-[min(var(--cw),42dvh,max(7.5rem,calc(100dvh-22rem-var(--sat)-var(--sab))))] rounded-xl" style={{
+          // A glow in the cover's own colour under the cover, softer while paused.
+          boxShadow: s.isPlaying ? '0 28px 70px -22px rgb(var(--art-rgb) / .7), 0 12px 30px -14px rgb(0 0 0 / .55)' : '0 16px 40px -20px rgb(var(--art-rgb) / .45), 0 8px 20px -12px rgb(0 0 0 / .5)',
           transform: s.isPlaying ? 'scale(1)' : 'scale(.92)',
-          transition: s.isPlaying ? 'transform calc(var(--dur-slow) * 1.35) cubic-bezier(.28, 1.7, .42, 1)' : 'transform var(--dur-slow) var(--ease-out)',
+          transition: s.isPlaying ? 'transform calc(var(--dur-slow) * 1.35) cubic-bezier(.28, 1.7, .42, 1), box-shadow var(--dur-slow) var(--ease-out)' : 'transform var(--dur-slow) var(--ease-out), box-shadow var(--dur-slow) var(--ease-out)',
         }} data-cover>
           <Art trackId={track.hasArt ? track.id : undefined} seed={`${track.album}|${track.artist}`} className="w-full" rounded="rounded-xl" vtName={playerOpen ? 'cadence-art' : undefined} shadow priority />
         </div>
         <div className="flex w-[var(--cw)] items-center gap-2" style={{ touchAction: 'auto' }}>
           <div className="min-w-0 flex-1">
-            <h2 className="line-clamp-2 text-title font-bold leading-tight">{track.title}</h2>
-            <div className="truncate text-body text-fg-2">{track.artist}</div>
+            <h2 className="text-title font-bold leading-tight"><Marquee key={track.id} text={track.title} /></h2>
+            {toArtist
+              ? <button className="press block max-w-full truncate text-left text-body text-fg-2" onClick={toArtist} aria-label={`Go to ${track.artist}`}>{track.artist}</button>
+              : <div className="truncate text-body text-fg-2">{track.artist}</div>}
             {track.license && <div className="truncate text-caption text-fg-3">{track.license.name} · {track.license.attribution}</div>}
           </div>
           <CircleButton label={fav ? 'Remove from favorites' : 'Add to favorites'} pressed={!!fav} onClick={() => { haptic(); void toggleFavorite(track.id); }}><HeartIcon size={18} filled={!!fav} /></CircleButton>
@@ -183,7 +202,7 @@ function NowTab({ track, touch }: { track: Track; touch: Touchy }) {
 function QueueTab({ track, touch }: { track: Track; touch: Touchy }) {
   const s = usePlayer();
   const p = getPlayer();
-  const tracks = useLiveQuery(() => db.tracks.bulkGet(s.queue.items), [s.queue.items]);
+  const tracks = useLiveQuery(() => db.tracks.bulkGet(s.queue.items).then((l) => l.map((t) => displayTrack(t))), [s.queue.items]);
   const library = useTracks();
   const { items, index, repeat } = s.queue;
   const [showHistory, setShowHistory] = useState(false);

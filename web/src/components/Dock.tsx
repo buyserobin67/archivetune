@@ -49,13 +49,13 @@ export function Dock() {
     <div
       ref={ref}
       className="absolute inset-x-0 bottom-0 z-30 pt-4 transition-transform duration-slow ease-out"
-      style={{ transform: keyboard ? 'translateY(120%)' : undefined, background: 'linear-gradient(to top, var(--bg) 62%, transparent)' }}
+      style={{ transform: keyboard ? 'translateY(120%)' : undefined, background: 'linear-gradient(to top, rgb(16 18 20 / .6) 25%, transparent)' }}
     >
       {/* With a mini-player the toast shows inside it; without one it sits just above the tab bar. */}
       {!hasTrack && !playerOpen && <ToastBubble className="absolute inset-x-0 bottom-full px-4 pb-2" />}
       <MiniPlayer />
       <nav aria-label="Primary" className="px-3" style={{ paddingBottom: 'calc(var(--sab) * 0.6 + 0.5rem)' }}>
-        <ul className="mx-auto flex max-w-md rounded-xl bg-s1 px-1 shadow-float">
+        <ul className="glass mx-auto flex max-w-md rounded-xl px-1">
           {TABS.map(({ to, label, Icon, end, prefix }) => (
             <li key={to} className="flex-1">
               <NavLink to={to} end={end} className={({ isActive }) => {

@@ -73,6 +73,25 @@ export async function trimTrack(trackId: string, proc: ArtProcessor, opts: { fla
   }
 }
 
+/**
+ * The square the user picked in Crop cover, in source pixels. Saved as a separate copy like a trim: the original stays,
+ * "Use original artwork" undoes it, and automatic trimming never replaces it.
+ */
+export async function cropTrack(trackId: string, proc: ArtProcessor, rect: Rect, d: CadenceDB = defaultDb): Promise<boolean> {
+  try {
+    const original = await getOriginalArtBlob(trackId, d);
+    if (!original) return false;
+    const r = { x: Math.max(0, Math.round(rect.x)), y: Math.max(0, Math.round(rect.y)), w: Math.max(1, Math.round(rect.w)), h: Math.max(1, Math.round(rect.h)) };
+    const blob = await proc.crop(original, r);
+    const img = await proc.decode(original, 16);
+    await d.artEdits.put({ trackId, kind: 'manual', blob, rect: r, from: img ? { w: img.srcWidth, h: img.srcHeight } : undefined, to: { w: r.w, h: r.h }, createdAt: Date.now() });
+    await invalidateArt(trackId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** "Use original": keeps a marker so automatic trimming does not redo it. */
 export async function useOriginal(trackId: string, d: CadenceDB = defaultDb): Promise<void> {
   const cur = await d.artEdits.get(trackId);
