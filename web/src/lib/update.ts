@@ -28,21 +28,31 @@ export interface UpdateState {
   /** A newer version is installed and waiting. */
   ready: boolean;
   checking: boolean;
+  /** A newer version was found and is downloading. */
+  installing: boolean;
   lastChecked: number | null;
-  /** Set when the last check failed (usually: offline). */
+  /** What went wrong with the last check or install, in words for the user. null when nothing did. */
   error: string | null;
+  /** The last failure happened because the device could not reach the server. */
+  offline: boolean;
   /** The user tapped Restart and the switch is in progress. */
   applying: boolean;
 }
 
+const EMPTY: UpdateState = { ready: false, checking: false, installing: false, lastChecked: null, error: null, offline: false, applying: false };
+
 export class UpdateManager {
-  private state: UpdateState = { ready: false, checking: false, lastChecked: null, error: null, applying: false };
+  private state: UpdateState = { ...EMPTY };
   private listeners = new Set<() => void>();
   private reg: RegistrationLike | null = null;
   private waiting: WorkerLike | null = null;
   private reloaded = false;
 
-  constructor(private container: ContainerLike, private reload: () => void, private fallbackMs = 4000) {
+  /**
+   * `reachable` says whether the server answers at all, so a failed check is only called "offline" when it is.
+   * The default assumes it does not (tests); the app passes a real probe.
+   */
+  constructor(private container: ContainerLike, private reload: () => void, private fallbackMs = 4000, private reachable: () => Promise<boolean> = async () => false) {
     container.addEventListener('controllerchange', () => {
       // The waiting worker took over (we asked it to). Reload exactly once to run the new files.
       if (this.state.applying) this.doReload();
@@ -61,7 +71,17 @@ export class UpdateManager {
   }
 
   private track(worker: WorkerLike): void {
-    const check = () => { if (worker.state === 'installed' && this.container.controller) this.markReady(worker); };
+    let installed = false;
+    const check = () => {
+      if (worker.state === 'installing') this.set({ installing: true, error: null, offline: false });
+      if (worker.state === 'installed' || worker.state === 'activating' || worker.state === 'activated') {
+        installed = true;
+        this.set({ installing: false });
+        if (worker.state === 'installed' && this.container.controller) this.markReady(worker);
+      }
+      // A worker that turns redundant before it ever installed failed its install (a file it needs could not be fetched).
+      if (worker.state === 'redundant' && !installed) this.set({ installing: false, error: 'A new version was found but could not be installed. Try again later.', offline: false });
+    };
     check();
     worker.addEventListener('statechange', check);
   }
@@ -74,12 +94,19 @@ export class UpdateManager {
   /** Asks the browser to look for a newer deploy. Safe to call often. */
   async check(now = Date.now()): Promise<void> {
     if (!this.reg || this.state.checking) return;
-    this.set({ checking: true, error: null });
+    this.set({ checking: true, error: null, offline: false });
     try {
       await this.reg.update();
       this.set({ lastChecked: now });
     } catch (e) {
-      this.set({ error: e instanceof Error ? e.message : 'Could not check for updates', lastChecked: now });
+      // Safari also rejects here when the new version fails to install, not only when there is no network.
+      const online = await this.reachable().catch(() => false);
+      const reason = e instanceof Error && e.message ? e.message : 'unknown error';
+      this.set({
+        lastChecked: now,
+        offline: !online,
+        error: online ? `The update could not be installed (${reason}). Try again later.` : 'Could not reach the server. Check your connection and try again.',
+      });
     } finally {
       this.set({ checking: false });
     }
@@ -117,7 +144,9 @@ export function getUpdateManager(): UpdateManager | null {
 export function initUpdates(): void {
   if (manager || typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !import.meta.env.PROD) return;
   const base = import.meta.env.BASE_URL;
-  manager = new UpdateManager(navigator.serviceWorker, () => location.reload());
+  // Asks the server for the worker script, skipping every cache. Any HTTP answer means we are online.
+  const reachable = () => fetch(`${base}sw.js`, { cache: 'no-store' }).then(() => true, () => false);
+  manager = new UpdateManager(navigator.serviceWorker, () => location.reload(), 4000, reachable);
   const m = manager;
   const go = () => {
     navigator.serviceWorker.register(`${base}sw.js`, { scope: base }).then((reg) => {
@@ -133,7 +162,7 @@ export function initUpdates(): void {
   setInterval(maybe, CHECK_EVERY_MS);
 }
 
-const EMPTY: UpdateState = { ready: false, checking: false, lastChecked: null, error: null, applying: false };
+
 const NOOP_SUB = () => () => {};
 
 export function useAppUpdate(): UpdateState {

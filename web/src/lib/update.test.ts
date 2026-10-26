@@ -93,9 +93,33 @@ describe('UpdateManager', () => {
     m.attach(r);
     await m.check(10);
     expect(m.getState()).toMatchObject({ lastChecked: 10, error: null, checking: false });
-    r.update.mockRejectedValueOnce(new Error('offline'));
+    r.update.mockRejectedValueOnce(new TypeError('Load failed'));
     await m.check(20);
-    expect(m.getState()).toMatchObject({ lastChecked: 20, error: 'offline', checking: false });
+    expect(m.getState()).toMatchObject({ lastChecked: 20, offline: true, checking: false });
+    expect(m.getState().error).toMatch(/Could not reach the server/);
+  });
+
+  it('only says offline when the server really cannot be reached', async () => {
+    const c = new C(), r = new Reg(), m = new UpdateManager(c, vi.fn(), 4000, async () => true);
+    m.attach(r);
+    r.update.mockRejectedValueOnce(new TypeError('Script resource evaluation failed'));
+    await m.check(30);
+    expect(m.getState().offline).toBe(false);
+    expect(m.getState().error).toMatch(/could not be installed \(Script resource evaluation failed\)/);
+    await m.check(40); // a later good check clears it
+    expect(m.getState()).toMatchObject({ error: null, offline: false });
+  });
+
+  it('shows a download in progress, and a failed install instead of "Up to date"', () => {
+    const c = new C(), r = new Reg(), m = new UpdateManager(c, vi.fn());
+    m.attach(r);
+    const w = new W(); r.found(w);
+    expect(m.getState().installing).toBe(true);
+    w.set('redundant');
+    expect(m.getState()).toMatchObject({ installing: false, ready: false });
+    expect(m.getState().error).toMatch(/could not be installed/);
+    const ok = new W(); r.found(ok); ok.set('installed');
+    expect(m.getState()).toMatchObject({ installing: false, ready: true, error: null });
   });
 });
 

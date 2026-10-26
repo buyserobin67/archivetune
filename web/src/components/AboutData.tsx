@@ -47,10 +47,14 @@ export function AboutData() {
           {u.ready ? (
             <button className={`${btn} bg-fg text-black`} disabled={u.applying} onClick={() => void mgr?.apply()}>{u.applying ? 'Restarting…' : 'Restart to update'}</button>
           ) : (
-            <button className={btn} disabled={!mgr || u.checking} onClick={() => void mgr?.check()}>{u.checking ? 'Checking…' : 'Check for updates'}</button>
+            <button className={btn} disabled={!mgr || u.checking || u.installing} onClick={() => void mgr?.check()}>{u.checking ? 'Checking…' : u.installing ? 'Downloading…' : 'Check for updates'}</button>
           )}
           <span className="text-caption text-fg-3" role="status">
-            {u.ready ? 'New Cadence version available — Restart to update.' : u.error ? 'Could not check (offline?)' : u.lastChecked ? 'Up to date' : mgr ? '' : 'Updates are checked in the installed app'}
+            {u.ready ? 'New Cadence version available — Restart to update.'
+              : u.installing ? 'Downloading the new version…'
+              : u.error ? u.error
+              : u.lastChecked ? `Up to date · checked ${new Date(u.lastChecked).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+              : mgr ? '' : 'Updates are checked in the installed app'}
           </span>
         </div>
 

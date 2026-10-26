@@ -25,7 +25,9 @@ Nothing restarts by itself, so an update never interrupts a song.
 
 ## Settings → About & data
 
-Shows the app version and build, the database version (this build expects v4), whether you are in Safari or the Home Screen app, the address you are on, an update history for this device, and a **Check for updates** button.
+Shows the app version and build, the database version (this build expects v4), whether you are in Safari or the Home Screen app, the address you are on, an update history for this device, and a **Check for updates** button. The status next to it says **Up to date** (with the time), **Downloading the new version…**, the restart prompt, or what went wrong. It only says the server could not be reached after checking that it really cannot; an update that fails to install is reported as such.
+
+**Fixed in 0.6.1: updates never installed on Cloudflare Pages.** The worker's offline file list included `_headers`, which Cloudflare reads as configuration and answers with 404. One missing file fails the whole install, so on Cloudflare no worker ever installed, nothing worked offline, and Check for updates said "offline?". Builds now leave host config files (`_headers`, `_redirects`, `_routes.json`, dotfiles) out of the list, `verify-dist` fails if one slips back in, and `npm run e2e:host` installs and updates the worker against a Cloudflare-like server. Phones pick the fix up on their own: the next check fetches the new worker, which now installs. Nothing to reinstall, and your library is untouched.
 
 ## Database changes (for developers)
 

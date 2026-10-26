@@ -60,6 +60,12 @@ jobs:
         env:
           E2E_BASE: /${{ github.event.repository.name }}/
 
+      # Service worker installs and updates on a host that 404s its config files (Cloudflare Pages), base "/".
+      - name: Updates on a Cloudflare-like host
+        run: npx vite build --outDir dist-root && HOST_DIST=dist-root npm run e2e:host
+        env:
+          VITE_BASE: /
+
       # Toasts, long-press menus, scrubbing, queue drag/swipe/undo, keep playing similar, karaoke, recap image, discs.
       - name: Polish interactions
         run: npm run e2e:polish

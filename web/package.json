@@ -1,7 +1,7 @@
 {
   "name": "cadence-web",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,8 @@
     "e2e:fill": "node e2e/fill.mjs",
     "e2e:upgrade": "node e2e/upgrade.mjs",
     "e2e:webkit-art": "node e2e/webkit-art.mjs",
-    "e2e:polish": "node e2e/polish.mjs"
+    "e2e:polish": "node e2e/polish.mjs",
+    "e2e:host": "node e2e/host.mjs"
   },
   "dependencies": {
     "dexie": "^4.4.7",

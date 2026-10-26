@@ -17,6 +17,8 @@ if (sw.includes('__PRECACHE_FILES__') || sw.includes('__SW_VERSION__')) fail('se
 const files = JSON.parse(/const FILES = (\[.*\]);/.exec(sw)?.[1] ?? 'null');
 if (!files?.includes('index.html')) fail('service worker precache list is empty');
 for (const f of files) if (!existsSync('dist/' + f)) fail('precached file missing from dist: ' + f);
+// Hosts read these and answer 404 for them, so precaching one makes every service-worker install (and update) fail.
+for (const f of files) if (/^(_headers|_redirects|_routes\.json)$|(^|\/)\./.test(f)) fail('host config file must not be precached: ' + f);
 if (!readdirSync('dist/assets').some((f) => f.endsWith('.js'))) fail('no JS bundle');
 
 // Nothing resembling personal media may ship: the app only ever stores music on the user's device.

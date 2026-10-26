@@ -41,6 +41,12 @@ function walk(dir: string): string[] {
  * inject both into dist/sw.js. Also copy index.html to 404.html so GitHub Pages
  * serves the app shell for unknown paths.
  */
+/**
+ * Files read by the host and never served (Cloudflare `_headers`, `_redirects`, `_routes.json`; dotfiles). Precaching
+ * one of them makes every service-worker install fail with a 404, which silently blocks all updates.
+ */
+export const isHostConfig = (f: string) => /^(_headers|_redirects|_routes\.json)$|(^|\/)\./.test(f);
+
 function serviceWorkerManifest(): Plugin {
   let outDir = 'dist';
   return {
@@ -52,7 +58,7 @@ function serviceWorkerManifest(): Plugin {
     closeBundle() {
       const files = walk(outDir)
         .map((f) => relative(outDir, f).split(sep).join('/'))
-        .filter((f) => f !== 'sw.js' && f !== '404.html' && !f.endsWith('.map') && !f.startsWith('splash/'));
+        .filter((f) => f !== 'sw.js' && f !== '404.html' && !f.endsWith('.map') && !f.startsWith('splash/') && !isHostConfig(f));
       const hash = createHash('sha256');
       for (const f of files.sort()) hash.update(f).update(readFileSync(join(outDir, f)));
       const version = hash.digest('hex').slice(0, 12);
