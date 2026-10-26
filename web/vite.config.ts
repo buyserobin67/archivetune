@@ -27,6 +27,8 @@ export const appDefines = {
   __APP_VERSION__: JSON.stringify(pkg.version),
   __APP_BUILD__: JSON.stringify(buildId()),
   __APP_BUILT_AT__: JSON.stringify(new Date().toISOString()),
+  // Cloudflare Pages sets this while building; it lets a frozen deploy address point to the live address of its branch.
+  __APP_BRANCH__: JSON.stringify(process.env.CF_PAGES_BRANCH ?? ''),
 };
 
 function walk(dir: string): string[] {

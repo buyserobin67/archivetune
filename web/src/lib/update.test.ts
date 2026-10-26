@@ -127,6 +127,13 @@ describe('classifyOrigin', () => {
   it('tells production, preview, local and custom addresses apart', () => {
     expect(classifyOrigin('cadence.pages.dev').kind).toBe('production');
     expect(classifyOrigin('abc123.cadence.pages.dev').kind).toBe('preview');
+    const snap = classifyOrigin('5e356954.cadence-music-bj8.pages.dev', 'claude/cadence-web-polish');
+    expect(snap.kind).toBe('snapshot');
+    expect(snap.liveUrls).toEqual([
+      { label: 'Latest of claude/cadence-web-polish', url: 'https://claude-cadence-web-polish.cadence-music-bj8.pages.dev/' },
+      { label: 'Main address', url: 'https://cadence-music-bj8.pages.dev/' },
+    ]);
+    expect(classifyOrigin('5e356954.cadence-music-bj8.pages.dev').liveUrls).toEqual([{ label: 'Main address', url: 'https://cadence-music-bj8.pages.dev/' }]);
     expect(classifyOrigin('claude-cadence-web-persistence.cadence.pages.dev').kind).toBe('preview');
     expect(classifyOrigin('localhost').kind).toBe('local');
     expect(classifyOrigin('127.0.0.1').kind).toBe('local');

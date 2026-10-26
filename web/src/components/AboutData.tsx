@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { APP_BUILD, APP_BUILT_AT, APP_VERSION } from '../lib/appInfo';
+import { APP_BRANCH, APP_BUILD, APP_BUILT_AT, APP_VERSION } from '../lib/appInfo';
 import { db, getSetting, SCHEMA_VERSION, type AppRun } from '../lib/db';
 import { classifyOrigin } from '../lib/origin';
 import { isStandalone } from '../lib/pwa';
@@ -16,7 +16,7 @@ export function AboutData() {
     void getSetting<AppRun[]>('appRuns', []).then(setRuns);
     void getActiveWorkerVersion().then(setWorker);
   }, [u.ready]);
-  const origin = classifyOrigin(location.hostname);
+  const origin = classifyOrigin(location.hostname, APP_BRANCH);
   const mgr = getUpdateManager();
   const built = APP_BUILT_AT ? new Date(APP_BUILT_AT).toLocaleString() : '';
 
@@ -39,9 +39,16 @@ export function AboutData() {
           ))}
         </dl>
 
-        <p className={`mt-3 rounded-md p-3 text-footnote ${origin.kind === 'preview' ? 'bg-amber-400/10 text-amber-200' : 'bg-white/5 text-fg-2'}`}>
-          {origin.note} Songs are stored per address, and Safari and the Home Screen app keep separate libraries even for the same address. Import music where you will play it, and update only from this same address.
-        </p>
+        <div className={`mt-3 rounded-md p-3 text-footnote ${origin.kind === 'preview' || origin.kind === 'snapshot' ? 'bg-amber-400/10 text-amber-200' : 'bg-white/5 text-fg-2'}`} data-origin={origin.kind}>
+          <p>{origin.note}{origin.kind !== 'snapshot' && ' Songs are stored per address, and Safari and the Home Screen app keep separate libraries even for the same address. Import music where you will play it, and update only from this same address.'}</p>
+          {origin.liveUrls && (
+            <ul className="mt-2 space-y-1">
+              {origin.liveUrls.map((l) => (
+                <li key={l.url}><span className="text-amber-200/70">{l.label}: </span><a className="break-all font-semibold underline" href={l.url} target="_blank" rel="noreferrer">{l.url.replace(/^https:\/\//, '').replace(/\/$/, '')}</a></li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {u.ready ? (
@@ -53,6 +60,7 @@ export function AboutData() {
             {u.ready ? 'New Cadence version available — Restart to update.'
               : u.installing ? 'Downloading the new version…'
               : u.error ? u.error
+              : u.lastChecked && origin.kind === 'snapshot' ? 'No newer version can appear at this fixed address'
               : u.lastChecked ? `Up to date · checked ${new Date(u.lastChecked).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
               : mgr ? '' : 'Updates are checked in the installed app'}
           </span>
